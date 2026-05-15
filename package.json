@@ -16,7 +16,7 @@
     "streaming"
   ],
   "author": "Pietro Marques",
-  "license": "ISC",
+  "license": "GPL-3.0-only",
   "type": "module",
   "dependencies": {
     "node-mac-virtual-display": "^1.0.13",

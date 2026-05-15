@@ -65,4 +65,4 @@ Sinta-se à vontade para abrir Issues e enviar Pull Requests! Sugestões de novo
 
 ## 📜 Licença
 
-Distribuído sob a licença ISC. Veja [LICENSE](LICENSE) para mais informações.
+Distribuído sob a licença GPL-3.0. Veja [LICENSE](LICENSE) para mais informações.

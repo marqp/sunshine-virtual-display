@@ -38,8 +38,30 @@ function findSunshineBin(): string {
   throw new Error('Sunshine não encontrado. Certifique-se de que está instalado ou no seu $PATH.');
 }
 
+function hasAdbDevice(): boolean {
+  try {
+    const output = execSync('adb devices', { encoding: 'utf8' }).trim();
+    const lines = output.split('\n');
+    // First line is "List of devices attached", so we check from the second line onwards
+    return lines.length > 1 && lines[1].trim() !== '' && lines[1].includes('\tdevice');
+  } catch {
+    return false;
+  }
+}
+
+function hasGnirehtet(): boolean {
+  try {
+    execSync('which gnirehtet', { encoding: 'utf8' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const SUNSHINE_BIN = findSunshineBin();
 const SUNSHINE_CONF = path.join(os.homedir(), '.config/sunshine/sunshine.conf');
+
+let gnirehtetProcess: ReturnType<typeof spawn> | null = null;
 
 async function main() {
   console.clear();
@@ -113,11 +135,32 @@ async function main() {
   // Verifica se o modo Headless/CI foi solicitado (pula o menu interativo)
   const isCiMode = process.argv.includes('--ci');
   let q;
+  let useUsbTethering = false;
 
   if (isCiMode) {
     console.log('🤖 Modo --ci ativado. Selecionando perfil Equilibrado automaticamente...');
     q = { minBit: 15000, maxBit: 30000, sw: 'fast' };
   } else {
+    // 1.5. Verificação de Tethering USB
+    const adbReady = hasAdbDevice();
+    const gnirehtetReady = hasGnirehtet();
+
+    if (adbReady && gnirehtetReady) {
+      const tetherResponse = await prompts({
+        type: 'confirm',
+        name: 'useUsbTethering',
+        message:
+          '🔌 Dispositivo Android detectado via cabo. Deseja ativar o Modo Turbo USB (Gnirehtet)?',
+        initial: true
+      });
+      useUsbTethering = tetherResponse.useUsbTethering;
+    } else if (adbReady && !gnirehtetReady) {
+      console.log('🔌 Dispositivo Android detectado, mas o Gnirehtet não está instalado.');
+      console.log(
+        '💡 Dica: Instale com `brew install gnirehtet` para habilitar o Modo Turbo USB.\n'
+      );
+    }
+
     // 2. Menu interativo para seleção de qualidade de transmissão
     const qualityResponse = await prompts({
       type: 'select',
@@ -197,6 +240,27 @@ async function main() {
     stdio: 'inherit' // Mantém os logs do Sunshine no terminal atual para debug do usuário
   });
 
+  if (useUsbTethering) {
+    console.log('🔌 Iniciando túnel USB (Gnirehtet)...');
+    gnirehtetProcess = spawn('gnirehtet', ['run'], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    if (gnirehtetProcess.stderr) {
+      gnirehtetProcess.stderr.on('data', (data) => {
+        const msg = data.toString();
+        // Loga apenas mensagens importantes do Gnirehtet, evitando flood de info
+        if (msg.includes('Exception') || msg.includes('Error') || msg.includes('fail')) {
+          console.error(`[Gnirehtet] ${msg.trim()}`);
+        }
+      });
+    }
+
+    console.log('\n======================================================');
+    console.log(' ℹ️  TÚNEL USB ATIVO: Conecte o Moonlight ao IP 10.0.2.2');
+    console.log('======================================================\n');
+  }
+
   // 5. Teardown / Cleanup: Encerramento de processos
   let isShuttingDown = false;
   const cleanup = () => {
@@ -206,6 +270,11 @@ async function main() {
     console.log('\n=========================================');
     console.log(' 🧹 Encerrando processos e limpando...   ');
     console.log('=========================================');
+
+    if (gnirehtetProcess && !gnirehtetProcess.killed) {
+      console.log('-> Fechando túnel USB (Gnirehtet)...');
+      gnirehtetProcess.kill('SIGINT');
+    }
 
     if (sunshineProcess && !sunshineProcess.killed) {
       console.log('-> Solicitando encerramento do Sunshine...');

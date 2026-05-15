@@ -1,71 +1,71 @@
 # Sunshine Virtual Display (macOS) ☀️
 
-Um wrapper interativo de linha de comando (CLI) feito em Node.js/TypeScript para criar **Telas Virtuais Nativas no macOS** e vinculá-las automaticamente ao servidor de streaming **Sunshine**. Ideal para quem quer fazer streaming sem um monitor físico ligado (Headless Mac).
+An interactive command-line wrapper (CLI) built with Node.js/TypeScript to create **Native Virtual Displays on macOS** and automatically provision them for the **Sunshine** streaming server. Ideal for high-performance headless streaming without physical monitors.
 
-## ✨ Funcionalidades
+## ✨ Features
 
-- **Monitor Virtual Nativo**: Cria monitores fantasmas em alta resolução sem adaptadores HDMI/Dummy usando APIs puras do macOS.
-- **Auto-Provisionamento do Sunshine**: Descobre automaticamente a instalação do Sunshine (Homebrew ou .app) e sobrepõe configurações on-the-fly (`sunshine.conf`).
-- **Menu Interativo (Presets)**: Perfis de bitrate pré-configurados:
-  - 🎮 Competitivo (Latência Ultra Baixa)
-  - ⚖️ Equilibrado (Fluidez e Nitidez)
-  - 🍿 Cinematográfico (Qualidade Máxima)
-- **Zero Vazamento de Memória**: Arquitetura IPC robusta com Parent Death Detection previne que as telas virtuais persistam caso o processo encerre inesperadamente (zumbis).
-- **Alta Performance (Inicialização Concorrente)**: A criação do monitor nativo (que pode demorar alguns segundos) ocorre em _background_ simultaneamente à exibição do menu interativo. Isso zera a latência percebida pelo usuário ao iniciar a transmissão.
-- **Modo Turbo USB (Cabo)**: Detecção automática de dispositivos Android via ADB para streaming via cabo USB (Gnirehtet). Ignora bloqueios de rede local e reduz a latência drasticamente.
-- **Auto-Cleanup (Plug & Play)**: O programa monitora a conexão USB; se o cabo for desplugado, a sessão é encerrada automaticamente para segurança e economia de recursos.
-- **Modo Headless/Automação (`--ci`)**: Suporte a execução desassistida (sem menu interativo) aplicando o perfil Equilibrado por padrão. Perfeito para atalhos do macOS, KDE Connect, ou scripts de inicialização.
-- **Compatibilidade Moderna**: Suporte a ESM e compilação híbrida; funciona perfeitamente com Bun e Node.js.
+- **Native Virtual Monitor**: Creates high-resolution ghost monitors without HDMI/Dummy adapters using pure macOS APIs.
+- **Sunshine Auto-Provisioning**: Automatically discovers Sunshine installations (Homebrew or .app) and overwrites configurations on-the-fly (`sunshine.conf`).
+- **Interactive Menu (Presets)**: Pre-configured bitrate profiles:
+  - 🎮 Competitive (Ultra Low Latency)
+  - ⚖️ Balanced (Smoothness and Clarity)
+  - 🍿 Cinematic (Maximum Quality)
+- **Zero Memory Leaks**: Robust IPC architecture with Parent Death Detection prevents virtual displays from persisting if the process exits unexpectedly (zombie processes).
+- **High Performance (Concurrent Initialization)**: Native monitor allocation (which may take a few seconds) occurs in the background while the user interacts with the menu. This eliminates perceived startup latency.
+- **Turbo USB Mode (Wired)**: Automatic detection of Android devices via ADB for streaming over USB cable (Gnirehtet). Bypasses local network restrictions and drastically reduces latency.
+- **Auto-Cleanup (Plug & Play)**: The program monitors the USB connection; if the cable is unplugged, the session is automatically terminated for security and resource efficiency.
+- **Headless/Automation Mode (`--ci`)**: Support for unattended execution (skipping interactive menus) using the Balanced profile by default. Perfect for macOS Shortcuts, KDE Connect, or startup scripts.
+- **Modern Compatibility**: ESM support and hybrid compilation; works perfectly with Bun and Node.js.
 
-## 🚀 Como instalar
+## 🚀 Getting Started
 
-### Pré-requisitos
+### Prerequisites
 
-- macOS (Apple Silicon ou Intel)
-- [Node.js](https://nodejs.org/) v18+ ou [Bun](https://bun.sh/)
-- [Sunshine](https://app.lizardbyte.dev/Sunshine/) instalado (via Homebrew ou .pkg)
-- **Opcional (Modo Turbo USB):** `brew install android-platform-tools gnirehtet`
+- macOS (Apple Silicon or Intel)
+- [Node.js](https://nodejs.org/) v18+ or [Bun](https://bun.sh/)
+- [Sunshine](https://app.lizardbyte.dev/Sunshine/) installed (via Homebrew or .pkg)
+- **Optional (Turbo USB Mode):** `brew install android-platform-tools gnirehtet`
 
-### Clonando e executando
+### Cloning and Running
 
 ```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/sunshine-vd.git
+# 1. Clone the repository
+git clone https://github.com/your-username/sunshine-vd.git
 cd sunshine-vd
 
-# 2. Instale as dependências
+# 2. Install dependencies
 npm install
 
-# 3. Modo Interativo
+# 3. Interactive Mode
 npx tsx index.ts
 
-# OU Modo Automatizado (Bypassa o menu e inicia no perfil Equilibrado)
+# OR Automated Mode (Bypasses the menu and starts with Balanced profile)
 npx tsx index.ts --ci
 ```
 
-_(Dica: Para carregamento mais rápido, você pode rodar com `bun run index.ts`)_
+*(Tip: For faster startup, you can run with `bun run index.ts`)*
 
-## 🧑‍💻 Comandos de Desenvolvimento
+## 🧑‍💻 Development Commands
 
-Este repositório está padronizado para contribuições usando ESLint e Prettier:
+This repository follows standard linting and formatting rules:
 
 ```bash
-npm run format # Formata o código
-npm run lint   # Checa a qualidade do código com ESLint
+npm run format # Formats the code
+npm run lint   # Checks code quality with ESLint
 ```
 
-## 🛠️ Arquitetura e Engenharia (Por Baixo do Capô)
+## 🛠️ Architecture and Engineering (Under the Hood)
 
-Para garantir estabilidade, segurança e evitar bugs clássicos de manipulação de processos:
+To ensure stability, security, and avoid common process management bugs:
 
-- **Escrita Atômica (Atomic Write)**: O arquivo de configuração do Sunshine (`sunshine.conf`) é manipulado com tolerância a falhas. Gravamos os dados em um `.tmp` e usamos `fs.renameSync` para que a escrita seja atômica no nível do SO, evitando arquivos corrompidos se o usuário der `Ctrl+C` no momento exato.
-- **Isolamento e Concorrência**: A alocação da Tela Virtual ocorre num sub-processo (`display-daemon.js`). Além de proteger o processo principal contra travamentos em APIs nativas C++, isso nos permite provisionar a tela concorrentemente em background enquanto o usuário navega nos menus.
-- **Teardown Gracioso (Graceful Degradation)**: Ao encerrar, o script prioriza enviar sinais de `SIGTERM` para permitir que o Sunshine limpe as portas e soquetes adequadamente antes de forçar o kill.
+- **Atomic Write**: The Sunshine configuration file (`sunshine.conf`) is handled with fault tolerance. We write data to a `.tmp` file and use `fs.renameSync` for an OS-level atomic write, preventing corrupted files if the user hits `Ctrl+C` at the wrong time.
+- **Isolation and Concurrency**: Virtual Display allocation happens in a sub-process (`display-daemon.js`). Besides protecting the main process from crashes in native C++ APIs, this allows us to provision the screen concurrently in the background while the user navigates the menus.
+- **Graceful Degradation**: Upon exit, the script prioritizes sending `SIGTERM` signals to allow Sunshine to clean up ports and sockets properly before forcing a kill.
 
-## 🤝 Contribuindo
+## 🤝 Contributing
 
-Sinta-se à vontade para abrir Issues e enviar Pull Requests! Sugestões de novos presets e refinamentos no setup nativo são muito bem-vindos.
+Feel free to open Issues and send Pull Requests! Suggestions for new presets and native setup refinements are highly welcome.
 
-## 📜 Licença
+## 📜 License
 
-Distribuído sob a licença GPL-3.0. Veja [LICENSE](LICENSE) para mais informações.
+Distributed under the GPL-3.0 license. See [LICENSE](LICENSE) for more information.

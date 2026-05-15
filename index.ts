@@ -38,14 +38,18 @@ function findSunshineBin(): string {
   throw new Error('Sunshine não encontrado. Certifique-se de que está instalado ou no seu $PATH.');
 }
 
-function hasAdbDevice(): boolean {
+function getAdbDeviceId(): string | null {
   try {
     const output = execSync('adb devices', { encoding: 'utf8' }).trim();
     const lines = output.split('\n');
-    // First line is "List of devices attached", so we check from the second line onwards
-    return lines.length > 1 && lines[1].trim() !== '' && lines[1].includes('\tdevice');
+    // Procuramos a primeira linha que contenha um dispositivo ativo
+    const deviceLine = lines.find((line) => line.includes('\tdevice'));
+    if (deviceLine) {
+      return deviceLine.split('\t')[0].trim();
+    }
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -68,6 +72,8 @@ async function main() {
   console.log('=========================================');
   console.log(' ☀️ Sunshine Native Auto-Provision (TS) ☀️ ');
   console.log('=========================================\n');
+
+  let unplugInterval: NodeJS.Timeout | null = null;
 
   // Fixamos a resolução em 1080p. O ajuste fino é feito via Configurações de Sistema do macOS
   const width = 1920;
@@ -136,16 +142,17 @@ async function main() {
   const isCiMode = process.argv.includes('--ci');
   let q;
   let useUsbTethering = false;
+  let connectedDeviceId: string | null = null;
 
   if (isCiMode) {
     console.log('🤖 Modo --ci ativado. Selecionando perfil Equilibrado automaticamente...');
     q = { minBit: 15000, maxBit: 30000, sw: 'fast' };
   } else {
     // 1.5. Verificação de Tethering USB
-    const adbReady = hasAdbDevice();
+    const adbDeviceId = getAdbDeviceId();
     const gnirehtetReady = hasGnirehtet();
 
-    if (adbReady && gnirehtetReady) {
+    if (adbDeviceId && gnirehtetReady) {
       const tetherResponse = await prompts({
         type: 'confirm',
         name: 'useUsbTethering',
@@ -154,7 +161,8 @@ async function main() {
         initial: true
       });
       useUsbTethering = tetherResponse.useUsbTethering;
-    } else if (adbReady && !gnirehtetReady) {
+      if (useUsbTethering) connectedDeviceId = adbDeviceId;
+    } else if (adbDeviceId && !gnirehtetReady) {
       console.log('🔌 Dispositivo Android detectado, mas o Gnirehtet não está instalado.');
       console.log(
         '💡 Dica: Instale com `brew install gnirehtet` para habilitar o Modo Turbo USB.\n'
@@ -259,13 +267,25 @@ async function main() {
     console.log('\n======================================================');
     console.log(' ℹ️  TÚNEL USB ATIVO: Conecte o Moonlight ao IP 10.0.2.2');
     console.log('======================================================\n');
+
+    // Monitoramento de desconexão do cabo
+    unplugInterval = setInterval(() => {
+      const currentId = getAdbDeviceId();
+      if (!currentId || currentId !== connectedDeviceId) {
+        console.log('\n🔌 Cabo USB desconectado. Encerrando sessão...');
+        cleanup();
+      }
+    }, 3000); // Verifica a cada 3 segundos
   }
 
   // 5. Teardown / Cleanup: Encerramento de processos
   let isShuttingDown = false;
+
   const cleanup = () => {
     if (isShuttingDown) return;
     isShuttingDown = true;
+
+    if (unplugInterval) clearInterval(unplugInterval);
 
     console.log('\n=========================================');
     console.log(' 🧹 Encerrando processos e limpando...   ');

@@ -1,0 +1,32 @@
+# Dependency directories
+node_modules/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Build/TypeScript output (if any)
+dist/
+out/
+*.tsbuildinfo
+
+# Personal/Agent context
+.gemini/
+MEMORY.md
+GEMINI.md
+code-review-optimizations.md
+quality-and-performance.md
+test-tsx-resolved-then-rejected.ts
+test-tsx-unhandled.ts
+test-tsx.ts

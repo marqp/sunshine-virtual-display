@@ -12,6 +12,8 @@ Um wrapper interativo de linha de comando (CLI) feito em Node.js/TypeScript para
   - 🍿 Cinematográfico (Qualidade Máxima)
 - **Zero Vazamento de Memória**: Arquitetura IPC robusta com Parent Death Detection previne que as telas virtuais persistam caso o processo encerre inesperadamente (zumbis).
 - **Alta Performance (Inicialização Concorrente)**: A criação do monitor nativo (que pode demorar alguns segundos) ocorre em _background_ simultaneamente à exibição do menu interativo. Isso zera a latência percebida pelo usuário ao iniciar a transmissão.
+- **Modo Turbo USB (Cabo)**: Detecção automática de dispositivos Android via ADB para streaming via cabo USB (Gnirehtet). Ignora bloqueios de rede local e reduz a latência drasticamente.
+- **Auto-Cleanup (Plug & Play)**: O programa monitora a conexão USB; se o cabo for desplugado, a sessão é encerrada automaticamente para segurança e economia de recursos.
 - **Modo Headless/Automação (`--ci`)**: Suporte a execução desassistida (sem menu interativo) aplicando o perfil Equilibrado por padrão. Perfeito para atalhos do macOS, KDE Connect, ou scripts de inicialização.
 - **Compatibilidade Moderna**: Suporte a ESM e compilação híbrida; funciona perfeitamente com Bun e Node.js.
 
@@ -22,6 +24,7 @@ Um wrapper interativo de linha de comando (CLI) feito em Node.js/TypeScript para
 - macOS (Apple Silicon ou Intel)
 - [Node.js](https://nodejs.org/) v18+ ou [Bun](https://bun.sh/)
 - [Sunshine](https://app.lizardbyte.dev/Sunshine/) instalado (via Homebrew ou .pkg)
+- **Opcional (Modo Turbo USB):** `brew install android-platform-tools gnirehtet`
 
 ### Clonando e executando
 

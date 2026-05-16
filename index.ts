@@ -38,11 +38,15 @@ function findSunshineBin(): string {
   throw new Error('Sunshine não encontrado. Certifique-se de que está instalado ou no seu $PATH.');
 }
 
+/**
+ * Detecta se existe um dispositivo Android conectado e autorizado via ADB.
+ * @returns O ID do dispositivo ou null se nenhum dispositivo for encontrado.
+ */
 function getAdbDeviceId(): string | null {
   try {
     const output = execSync('adb devices', { encoding: 'utf8' }).trim();
     const lines = output.split('\n');
-    // Procuramos a primeira linha que contenha um dispositivo ativo
+    // Procuramos a primeira linha que contenha um dispositivo ativo e autorizado
     const deviceLine = lines.find((line) => line.includes('\tdevice'));
     if (deviceLine) {
       return deviceLine.split('\t')[0].trim();
@@ -53,6 +57,9 @@ function getAdbDeviceId(): string | null {
   }
 }
 
+/**
+ * Verifica se o binário do gnirehtet está instalado no sistema.
+ */
 function hasGnirehtet(): boolean {
   try {
     execSync('which gnirehtet', { encoding: 'utf8' });
@@ -268,7 +275,11 @@ async function main() {
     console.log(' ℹ️  TÚNEL USB ATIVO: Conecte o Moonlight ao IP 10.0.2.2');
     console.log('======================================================\n');
 
-    // Monitoramento de desconexão do cabo
+    /**
+     * Monitoramento de hardware:
+     * Verifica periodicamente se o cabo USB foi removido ou se a depuração foi desativada.
+     * Se o ID do dispositivo sumir ou mudar, encerramos tudo imediatamente por segurança.
+     */
     unplugInterval = setInterval(() => {
       const currentId = getAdbDeviceId();
       if (!currentId || currentId !== connectedDeviceId) {

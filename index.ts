@@ -6,22 +6,22 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 /**
- * Compatibilidade para ambientes híbridos (Node.js/Bun) e módulos ES (ESM).
- * Resolve __filename e __dirname pois eles não existem nativamente no escopo ESM.
+ * Compatibility for hybrid environments (Node.js/Bun) and ES modules (ESM).
+ * Resolves __filename and __dirname as they don't exist natively in ESM scope.
  */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Procura dinamicamente o executável do Sunshine no sistema.
- * Ideal para suportar instalações via Homebrew, pacote nativo (.app), ou build manual.
+ * Dynamically looks for the Sunshine executable in the system.
+ * Ideal for supporting installations via Homebrew, native package (.app), or manual build.
  */
 function findSunshineBin(): string {
   try {
     const binPath = execSync('which sunshine', { encoding: 'utf8' }).trim();
     if (binPath) return binPath;
   } catch {
-    /* Ignora se 'which' falhar e avança para os fallbacks */
+    /* Ignore if 'which' fails and move to fallbacks */
   }
 
   const commonPaths = [
@@ -35,18 +35,18 @@ function findSunshineBin(): string {
     if (fs.existsSync(p)) return p;
   }
 
-  throw new Error('Sunshine não encontrado. Certifique-se de que está instalado ou no seu $PATH.');
+  throw new Error('Sunshine not found. Make sure it is installed or in your $PATH.');
 }
 
 /**
- * Detecta se existe um dispositivo Android conectado e autorizado via ADB.
- * @returns O ID do dispositivo ou null se nenhum dispositivo for encontrado.
+ * Detects if there is an Android device connected and authorized via ADB.
+ * @returns The device ID or null if no device is found.
  */
 function getAdbDeviceId(): string | null {
   try {
     const output = execSync('adb devices', { encoding: 'utf8' }).trim();
     const lines = output.split('\n');
-    // Procuramos a primeira linha que contenha um dispositivo ativo e autorizado
+    // Look for the first line that contains an active and authorized device
     const deviceLine = lines.find((line) => line.includes('\tdevice'));
     if (deviceLine) {
       return deviceLine.split('\t')[0].trim();
@@ -58,7 +58,7 @@ function getAdbDeviceId(): string | null {
 }
 
 /**
- * Verifica se o binário do gnirehtet está instalado no sistema.
+ * Checks if the gnirehtet binary is installed in the system.
  */
 function hasGnirehtet(): boolean {
   try {
@@ -82,14 +82,14 @@ async function main() {
 
   let unplugInterval: NodeJS.Timeout | null = null;
 
-  // Fixamos a resolução em 1080p. O ajuste fino é feito via Configurações de Sistema do macOS
+  // We fix the resolution at 1080p. Fine-tuning is done via macOS System Settings
   const width = 1920;
   const height = 1080;
 
-  // 1. Otimização de Performance (Background Provisioning)
-  // Como a resolução já é conhecida, disparamos a criação da tela virtual nativa no SO em paralelo.
-  // Isso mascara a latência de inicialização enquanto o usuário lê e escolhe as opções do menu.
-  console.log('⏳ Provisionando monitor virtual em background...');
+  // 1. Performance Optimization (Background Provisioning)
+  // Since the resolution is already known, we trigger the creation of the native virtual screen in parallel.
+  // This masks initialization latency while the user reads and chooses menu options.
+  console.log('⏳ Provisioning virtual monitor in background...');
   const daemonPath = path.join(__dirname, 'display-daemon.js');
   const displayProcess = spawn('node', [daemonPath, width.toString(), height.toString()], {
     stdio: ['ignore', 'pipe', 'pipe', 'ipc']
@@ -97,11 +97,11 @@ async function main() {
 
   let displayId: string | null = null;
 
-  // Extrai o ID do display nativo a partir da saída (logs) do processo daemon C++
+  // Extract the native display ID from the C++ daemon process output (logs)
   const waitForDisplay = new Promise<string>((resolve, reject) => {
     let outputBuffer = '';
 
-    // Flag para evitar rejeições tardias de derrubarem o processo pai
+    // Flag to prevent late rejections from crashing the parent process
     let isResolved = false;
 
     const processOutput = (data: Buffer) => {
@@ -119,7 +119,7 @@ async function main() {
     if (displayProcess.stdout) displayProcess.stdout.on('data', processOutput);
     if (displayProcess.stderr) displayProcess.stderr.on('data', processOutput);
 
-    // Escuta erros emitidos pelo daemon via canal IPC
+    // Listen for errors emitted by the daemon via IPC channel
     displayProcess.on('message', (msg: any) => {
       if (!isResolved && msg.type === 'ERROR') reject(new Error(msg.message));
     });
@@ -129,33 +129,33 @@ async function main() {
     });
 
     displayProcess.on('exit', (code) => {
-      // Só consideramos erro se saiu antes de nos dar o ID de sucesso
+      // We only consider it an error if it exited before giving us the success ID
       if (!isResolved) {
-        reject(new Error(`Daemon do monitor encerrou prematuramente com código ${code}`));
+        reject(new Error(`Display daemon exited prematurely with code ${code}`));
       } else {
-        // Se o daemon fechar *após* estar resolvido, o cleanup chamará exit depois de matar o sunshine
-        console.log(`\n⚠️  Daemon do monitor virtual encerrado (código ${code}).`);
+        // If the daemon closes *after* being resolved, cleanup will call exit after killing sunshine
+        console.log(`\n⚠️  Virtual monitor daemon closed (code ${code}).`);
         if (typeof cleanup === 'function') cleanup();
       }
     });
 
-    // Timeout de 10s (aumentado pois o usuário pode demorar no menu)
+    // 10s timeout (increased as user might take time in the menu)
     setTimeout(() => {
-      if (!isResolved) reject(new Error('Timeout aguardando inicialização do monitor.'));
+      if (!isResolved) reject(new Error('Timeout waiting for monitor initialization.'));
     }, 10000);
   });
 
-  // Verifica se o modo Headless/CI foi solicitado (pula o menu interativo)
+  // Check if Headless/CI mode was requested (skips interactive menu)
   const isCiMode = process.argv.includes('--ci');
   let q;
   let useUsbTethering = false;
   let connectedDeviceId: string | null = null;
 
   if (isCiMode) {
-    console.log('🤖 Modo --ci ativado. Selecionando perfil Equilibrado automaticamente...');
+    console.log('🤖 --ci mode active. Automatically selecting Balanced profile...');
     q = { minBit: 15000, maxBit: 30000, sw: 'fast' };
   } else {
-    // 1.5. Verificação de Tethering USB
+    // 1.5. USB Tethering Check
     const adbDeviceId = getAdbDeviceId();
     const gnirehtetReady = hasGnirehtet();
 
@@ -164,34 +164,34 @@ async function main() {
         type: 'confirm',
         name: 'useUsbTethering',
         message:
-          '🔌 Dispositivo Android detectado via cabo. Deseja ativar o Modo Turbo USB (Gnirehtet)?',
+          '🔌 Android device detected via cable. Enable Turbo USB Mode (Gnirehtet)?',
         initial: true
       });
       useUsbTethering = tetherResponse.useUsbTethering;
       if (useUsbTethering) connectedDeviceId = adbDeviceId;
     } else if (adbDeviceId && !gnirehtetReady) {
-      console.log('🔌 Dispositivo Android detectado, mas o Gnirehtet não está instalado.');
+      console.log('🔌 Android device detected, but Gnirehtet is not installed.');
       console.log(
-        '💡 Dica: Instale com `brew install gnirehtet` para habilitar o Modo Turbo USB.\n'
+        '💡 Tip: Install with `brew install gnirehtet` to enable Turbo USB Mode.\n'
       );
     }
 
-    // 2. Menu interativo para seleção de qualidade de transmissão
+    // 2. Interactive menu for streaming quality selection
     const qualityResponse = await prompts({
       type: 'select',
       name: 'quality',
-      message: '✨ Selecione a qualidade de transmissão:',
+      message: '✨ Select streaming quality:',
       choices: [
         {
-          title: '🎮 Competitivo (Latência Ultra Baixa)',
+          title: '🎮 Competitive (Ultra Low Latency)',
           value: { minBit: 5000, maxBit: 15000, sw: 'fast' }
         },
         {
-          title: '⚖️  Equilibrado (Fluidez e Nitidez)',
+          title: '⚖️  Balanced (Smoothness & Clarity)',
           value: { minBit: 15000, maxBit: 30000, sw: 'fast' }
         },
         {
-          title: '🍿 Cinematográfico (Qualidade Máxima)',
+          title: '🍿 Cinematic (Maximum Quality)',
           value: { minBit: 30000, maxBit: 60000, sw: 'medium' }
         }
       ],
@@ -199,7 +199,7 @@ async function main() {
     });
 
     if (!qualityResponse.quality) {
-      console.log('❌ Operação cancelada.');
+      console.log('❌ Operation cancelled.');
       if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
       process.exit(1);
     }
@@ -207,21 +207,21 @@ async function main() {
     q = qualityResponse.quality;
   }
 
-  console.log(`\n✅ Resolução: ${width}x${height} | Target Bitrate: ${q.maxBit / 1000}Mbps\n`);
+  console.log(`\n✅ Resolution: ${width}x${height} | Target Bitrate: ${q.maxBit / 1000}Mbps\n`);
 
   try {
-    // 3. Aguarda a inicialização (se já não estiver pronta)
+    // 3. Wait for initialization (if not already ready)
     displayId = await waitForDisplay;
-    console.log(`✅ Monitor inicializado nativamente! (CGDirectDisplayID: ${displayId})`);
+    console.log(`✅ Monitor initialized natively! (CGDirectDisplayID: ${displayId})`);
   } catch (err: any) {
-    console.error(`❌ Erro ao criar monitor: ${err.message}`);
+    console.error(`❌ Error creating monitor: ${err.message}`);
     if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
     process.exit(1);
   }
 
-  // 3. Injeta configuração dinâmica no arquivo sunshine.conf (Estado da Arte no macOS)
-  // Associa a transmissão diretamente ao Virtual Display recém-criado
-  console.log('⚙️  Otimizando Sunshine via ScreenCaptureKit...');
+  // 3. Inject dynamic configuration into sunshine.conf (State of the art on macOS)
+  // Associate the stream directly with the newly created Virtual Display
+  console.log('⚙️  Optimizing Sunshine via ScreenCaptureKit...');
 
   const sunshineConfig = [
     `output_name = ${displayId}`,
@@ -238,25 +238,25 @@ async function main() {
       fs.mkdirSync(configDir, { recursive: true });
     }
 
-    // Escrita atômica (Atomic Write):
-    // Grava primeiro num temp file e renomeia para evitar corrupção de arquivo
+    // Atomic Write:
+    // Write to a temp file first and rename to avoid file corruption
     const tempConfigPath = `${SUNSHINE_CONF}.tmp.${Date.now()}`;
     fs.writeFileSync(tempConfigPath, sunshineConfig);
     fs.renameSync(tempConfigPath, SUNSHINE_CONF);
   } catch (err: any) {
-    console.error(`❌ Erro ao salvar configuração: ${err.message}`);
+    console.error(`❌ Error saving configuration: ${err.message}`);
     if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
     process.exit(1);
   }
 
-  // 4. Executa Sunshine com a nova configuração configurada dinamicamente
-  console.log('🚀 Iniciando Sunshine...\n');
+  // 4. Run Sunshine with the newly configured dynamic settings
+  console.log('🚀 Starting Sunshine...\n');
   const sunshineProcess = spawn(SUNSHINE_BIN, [SUNSHINE_CONF], {
-    stdio: 'inherit' // Mantém os logs do Sunshine no terminal atual para debug do usuário
+    stdio: 'inherit' // Keep Sunshine logs in the current terminal for user debugging
   });
 
   if (useUsbTethering) {
-    console.log('🔌 Iniciando túnel USB (Gnirehtet)...');
+    console.log('🔌 Starting USB tunnel (Gnirehtet)...');
     gnirehtetProcess = spawn('gnirehtet', ['run'], {
       stdio: ['ignore', 'pipe', 'pipe']
     });
@@ -264,7 +264,7 @@ async function main() {
     if (gnirehtetProcess.stderr) {
       gnirehtetProcess.stderr.on('data', (data) => {
         const msg = data.toString();
-        // Loga apenas mensagens importantes do Gnirehtet, evitando flood de info
+        // Log only important Gnirehtet messages to avoid flooding info
         if (msg.includes('Exception') || msg.includes('Error') || msg.includes('fail')) {
           console.error(`[Gnirehtet] ${msg.trim()}`);
         }
@@ -272,24 +272,24 @@ async function main() {
     }
 
     console.log('\n======================================================');
-    console.log(' ℹ️  TÚNEL USB ATIVO: Conecte o Moonlight ao IP 10.0.2.2');
+    console.log(' ℹ️  USB TUNNEL ACTIVE: Connect Moonlight to IP 10.0.2.2');
     console.log('======================================================\n');
 
     /**
-     * Monitoramento de hardware:
-     * Verifica periodicamente se o cabo USB foi removido ou se a depuração foi desativada.
-     * Se o ID do dispositivo sumir ou mudar, encerramos tudo imediatamente por segurança.
+     * Hardware Monitoring:
+     * Periodically checks if the USB cable was removed or if debugging was disabled.
+     * If the device ID disappears or changes, we shut everything down immediately for safety.
      */
     unplugInterval = setInterval(() => {
       const currentId = getAdbDeviceId();
       if (!currentId || currentId !== connectedDeviceId) {
-        console.log('\n🔌 Cabo USB desconectado. Encerrando sessão...');
+        console.log('\n🔌 USB cable disconnected. Closing session...');
         cleanup();
       }
-    }, 3000); // Verifica a cada 3 segundos
+    }, 3000); // Check every 3 seconds
   }
 
-  // 5. Teardown / Cleanup: Encerramento de processos
+  // 5. Teardown / Cleanup: Process termination
   let isShuttingDown = false;
 
   const cleanup = () => {
@@ -299,48 +299,48 @@ async function main() {
     if (unplugInterval) clearInterval(unplugInterval);
 
     console.log('\n=========================================');
-    console.log(' 🧹 Encerrando processos e limpando...   ');
+    console.log(' 🧹 Closing processes and cleaning up... ');
     console.log('=========================================');
 
     if (gnirehtetProcess && !gnirehtetProcess.killed) {
-      console.log('-> Fechando túnel USB (Gnirehtet)...');
+      console.log('-> Closing USB tunnel (Gnirehtet)...');
       gnirehtetProcess.kill('SIGINT');
     }
 
     if (sunshineProcess && !sunshineProcess.killed) {
-      console.log('-> Solicitando encerramento do Sunshine...');
-      sunshineProcess.kill('SIGTERM'); // Tenta fechamento gracioso primeiro (Graceful Degradation)
+      console.log('-> Requesting Sunshine shutdown...');
+      sunshineProcess.kill('SIGTERM'); // Try graceful shutdown first (Graceful Degradation)
 
-      // Fallback para SIGKILL agressivo se o Sunshine travar e demorar mais de 2s
+      // Fallback to aggressive SIGKILL if Sunshine hangs longer than 2s
       setTimeout(() => {
         if (!sunshineProcess.killed) sunshineProcess.kill('SIGKILL');
       }, 2000);
     }
 
     if (displayProcess && !displayProcess.killed) {
-      console.log('-> Destruindo virtual display nativo...');
+      console.log('-> Destroying native virtual display...');
       displayProcess.kill('SIGINT');
     }
 
-    // Dá um pequeno atraso para os processos morrerem graciosamente no OS
+    // Give a small delay for processes to die gracefully in the OS
     setTimeout(() => {
-      console.log('✅ Feito. Até logo!');
+      console.log('✅ Done. Goodbye!');
       process.exit(0);
     }, 500);
   };
 
-  // Intercepta fechamento da janela ou Ctrl+C para garantir teardown correto
+  // Intercept window closing or Ctrl+C to ensure correct teardown
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
 
-  // Se o servidor Sunshine fechar sozinho (crash), iniciamos o cleanup geral
+  // If Sunshine server exits on its own (crash), trigger general cleanup
   sunshineProcess.on('exit', () => {
-    console.log('\n⚠️  Sunshine foi encerrado.');
+    console.log('\n⚠️  Sunshine has been terminated.');
     cleanup();
   });
 }
 
 main().catch((err) => {
-  console.error('Erro não tratado:', err);
+  console.error('Unhandled error:', err);
   process.exit(1);
 });

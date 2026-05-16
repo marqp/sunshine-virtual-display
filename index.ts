@@ -85,63 +85,82 @@ async function main() {
   // We fix the resolution at 1080p. Fine-tuning is done via macOS System Settings
   const width = 1920;
   const height = 1080;
+  const VIRTUAL_DISPLAY_NAME = 'Sunshine Virtual Display';
 
   // 1. Performance Optimization (Background Provisioning)
   // Since the resolution is already known, we trigger the creation of the native virtual screen in parallel.
   // This masks initialization latency while the user reads and chooses menu options.
   console.log('⏳ Provisioning virtual monitor in background...');
   const daemonPath = path.join(__dirname, 'display-daemon.js');
-  const displayProcess = spawn('node', [daemonPath, width.toString(), height.toString()], {
-    stdio: ['ignore', 'pipe', 'pipe', 'ipc']
-  });
+  const displayProcess = spawn(
+    'node',
+    [daemonPath, width.toString(), height.toString(), VIRTUAL_DISPLAY_NAME],
+    {
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc']
+    }
+  );
 
   let displayId: string | null = null;
 
-  // Extract the native display ID from the C++ daemon process output (logs)
+  // Extract the native display ID from the C++ daemon process via IPC messages
   const waitForDisplay = new Promise<string>((resolve, reject) => {
-    let outputBuffer = '';
-
     // Flag to prevent late rejections from crashing the parent process
     let isResolved = false;
+    let daemonLogs = '';
 
-    const processOutput = (data: Buffer) => {
-      if (isResolved) return;
-      const chunk = data.toString();
-      outputBuffer += chunk;
-
-      const match = outputBuffer.match(/Virtual display created with ID:\s*(\d+)/);
-      if (match) {
-        isResolved = true;
-        resolve(match[1]);
-      }
-    };
-
-    if (displayProcess.stdout) displayProcess.stdout.on('data', processOutput);
-    if (displayProcess.stderr) displayProcess.stderr.on('data', processOutput);
-
-    // Listen for errors emitted by the daemon via IPC channel
+    // Listen for messages emitted by the daemon via IPC channel
     displayProcess.on('message', (msg: any) => {
-      if (!isResolved && msg.type === 'ERROR') reject(new Error(msg.message));
+      if (isResolved) return;
+
+      if (msg.type === 'SUCCESS' && msg.id) {
+        isResolved = true;
+        resolve(msg.id.toString());
+      } else if (msg.type === 'ERROR') {
+        isResolved = true;
+        console.error(`\n❌ Daemon Error: ${msg.message}`);
+        if (daemonLogs) console.error(`\n[Daemon Debug Logs]:\n${daemonLogs}`);
+        reject(new Error(msg.message));
+      }
     });
 
+    if (displayProcess.stderr) {
+      displayProcess.stderr.on('data', (data) => {
+        // Buffer logs instead of printing immediately to keep the UI clean
+        daemonLogs += data.toString();
+      });
+    }
+
     displayProcess.on('error', (err) => {
-      if (!isResolved) reject(err);
+      if (!isResolved) {
+        isResolved = true;
+        if (daemonLogs) console.error(`\n[Daemon Debug Logs]:\n${daemonLogs}`);
+        reject(err);
+      }
     });
 
     displayProcess.on('exit', (code) => {
       // We only consider it an error if it exited before giving us the success ID
       if (!isResolved) {
+        isResolved = true;
+        if (code !== 0 && daemonLogs) {
+          console.error(`\n[Daemon Debug Logs]:\n${daemonLogs}`);
+        }
         reject(new Error(`Display daemon exited prematurely with code ${code}`));
       } else {
         // If the daemon closes *after* being resolved, cleanup will call exit after killing sunshine
-        console.log(`\n⚠️  Virtual monitor daemon closed (code ${code}).`);
+        if (code !== 0 && code !== null) {
+          console.log(`\n⚠️  Virtual monitor daemon closed (code ${code}).`);
+        }
         if (typeof cleanup === 'function') cleanup();
       }
     });
 
     // 10s timeout (increased as user might take time in the menu)
     setTimeout(() => {
-      if (!isResolved) reject(new Error('Timeout waiting for monitor initialization.'));
+      if (!isResolved) {
+        isResolved = true;
+        reject(new Error('Timeout waiting for monitor initialization.'));
+      }
     }, 10000);
   });
 
@@ -163,17 +182,14 @@ async function main() {
       const tetherResponse = await prompts({
         type: 'confirm',
         name: 'useUsbTethering',
-        message:
-          '🔌 Android device detected via cable. Enable Turbo USB Mode (Gnirehtet)?',
+        message: '🔌 Android device detected via cable. Enable Turbo USB Mode (Gnirehtet)?',
         initial: true
       });
       useUsbTethering = tetherResponse.useUsbTethering;
       if (useUsbTethering) connectedDeviceId = adbDeviceId;
     } else if (adbDeviceId && !gnirehtetReady) {
       console.log('🔌 Android device detected, but Gnirehtet is not installed.');
-      console.log(
-        '💡 Tip: Install with `brew install gnirehtet` to enable Turbo USB Mode.\n'
-      );
+      console.log('💡 Tip: Install with `brew install gnirehtet` to enable Turbo USB Mode.\n');
     }
 
     // 2. Interactive menu for streaming quality selection
@@ -213,6 +229,12 @@ async function main() {
     // 3. Wait for initialization (if not already ready)
     displayId = await waitForDisplay;
     console.log(`✅ Monitor initialized natively! (CGDirectDisplayID: ${displayId})`);
+
+    /**
+     * Safety delay: macOS needs a brief moment to register the new display
+     * in the window server before Sunshine can correctly capture it.
+     */
+    await new Promise((resolve) => setTimeout(resolve, 1500));
   } catch (err: any) {
     console.error(`❌ Error creating monitor: ${err.message}`);
     if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
@@ -223,7 +245,7 @@ async function main() {
   // Associate the stream directly with the newly created Virtual Display
   console.log('⚙️  Optimizing Sunshine via ScreenCaptureKit...');
 
-  // Note: min_bitrate is not supported in recent Sunshine versions. 
+  // Note: min_bitrate is not supported in recent Sunshine versions.
   // Bitrates are defined in Kbps.
   const sunshineConfig = [
     `output_name = ${displayId}`,
@@ -257,6 +279,7 @@ async function main() {
   try {
     if (os.platform() === 'darwin') {
       execSync('killall sunshine 2>/dev/null || true');
+      execSync('sleep 1'); // Wait 1 second for the OS to release network sockets
     }
   } catch {
     /* Ignore errors if no process was found */

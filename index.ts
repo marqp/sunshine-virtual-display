@@ -223,9 +223,10 @@ async function main() {
   // Associate the stream directly with the newly created Virtual Display
   console.log('⚙️  Optimizing Sunshine via ScreenCaptureKit...');
 
+  // Note: min_bitrate is not supported in recent Sunshine versions. 
+  // Bitrates are defined in Kbps.
   const sunshineConfig = [
     `output_name = ${displayId}`,
-    `min_bitrate = ${q.minBit}`,
     `max_bitrate = ${q.maxBit}`,
     `sw_preset = ${q.sw}`,
     `sw_tune = zerolatency`,
@@ -251,6 +252,16 @@ async function main() {
 
   // 4. Run Sunshine with the newly configured dynamic settings
   console.log('🚀 Starting Sunshine...\n');
+
+  // Kill any existing Sunshine instances to prevent port conflicts or config locks
+  try {
+    if (os.platform() === 'darwin') {
+      execSync('killall sunshine 2>/dev/null || true');
+    }
+  } catch {
+    /* Ignore errors if no process was found */
+  }
+
   const sunshineProcess = spawn(SUNSHINE_BIN, [SUNSHINE_CONF], {
     stdio: 'inherit' // Keep Sunshine logs in the current terminal for user debugging
   });

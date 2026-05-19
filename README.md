@@ -1,102 +1,39 @@
 # Sunshine Virtual Display (macOS) ☀️
 
-An interactive command-line wrapper (CLI) built with Node.js/TypeScript to create **Native Virtual Displays on macOS** and automatically provision them for the **Sunshine** streaming server. Ideal for high-performance headless streaming without physical monitors.
+I "vibecoded" this little app because I wanted something like Apple Sidecar, but for my Android tablet (yes, I'm balling on a budget). It was a fun process, so I decided to share it here. As a bonus, it works as a third monitor even on a base M1 MacBook Air!
 
-## ✨ Features
+## 🚀 Quick Install
 
-- **Native Virtual Monitor**: Creates high-resolution ghost monitors without HDMI/Dummy adapters using pure macOS APIs.
-- **Sunshine Auto-Provisioning**: Automatically discovers Sunshine installations (Homebrew or .app) and overwrites configurations on-the-fly (`sunshine.conf`).
-- **Interactive Menu (Presets)**: Pre-configured bitrate profiles:
-  - 🎮 Competitive (Ultra Low Latency)
-  - ⚖️ Balanced (Smoothness and Clarity)
-  - 🍿 Cinematic (Maximum Quality)
-- **Audio Routing Control**: Interactive toggle to enable or disable system audio redirection to the tablet/client.
-- **Zero Memory Leaks**: Robust IPC architecture with Parent Death Detection prevents virtual displays from persisting if the process exits unexpectedly (zombie processes).
-- **High Performance (Concurrent Initialization)**: Native monitor allocation (which may take a few seconds) occurs in the background while the user interacts with the menu.
-- **Turbo USB Mode (Wired)**: Automatic detection of Android devices via ADB for streaming over USB cable (Gnirehtet). Bypasses local network restrictions and drastically reduces latency.
-- **Auto-Cleanup (Plug & Play)**: The program monitors the USB connection; if the cable is unplugged, the session is automatically terminated for security and resource efficiency.
-- **Smart Automation Mode (`--ci`)**: Support for unattended execution. Automatically enables Turbo USB Mode if a device is detected and upgrades quality to **Cinematic** for wired connections.
-- **Standalone Binaries**: Native macOS executables (x64 and ARM64) that run without requiring Node.js installed on the system.
-- **Unit Tested**: Robust logic with >90% code coverage across system utilities, CLI menus, and configuration generation.
-
-## 🔌 Turbo USB Mode (Wired Streaming)
-
-This tool features a built-in **Turbo USB Mode** designed for scenarios where local Wi-Fi is unstable, ports are blocked by firewalls, or ultra-low latency is required.
-
-### Why use it?
-
-- **Bypass Firewalls**: Works even if your router blocks Sunshine's ports (e.g., in hotels or universities).
-- **Reduced Latency**: Eliminates Wi-Fi jitter and interference.
-- **Privacy**: Streaming data stays strictly on the USB cable.
-
-### How it works
-
-1. **Detection**: The CLI checks for an Android device with **USB Debugging** enabled.
-2. **Reverse Tethering**: It spawns a `gnirehtet` instance, which creates a virtual network tunnel over ADB.
-3. **Auto-Connection**: You connect Moonlight to the static IP `10.0.2.2`.
-4. **Safety Lock**: The program monitors the physical connection. If you unplug the cable, the entire streaming session (including the virtual display) is automatically torn down.
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- macOS (Apple Silicon or Intel)
-- [Sunshine](https://app.lizardbyte.dev/Sunshine/) installed (via Homebrew or .pkg)
-- **Optional (Turbo USB Mode):** `brew install android-platform-tools gnirehtet`
-
-### Quick Installation (Standalone Binary)
-
-Install the latest version globally in one step (no Node.js required):
+Install the latest version globally in one step (no Node.js or cloning required):
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/marqp/sunshine-virtual-display/main/install.sh | bash
 ```
 
-This script automatically detects your Mac's architecture, downloads the latest release, and installs it as `/usr/local/bin/sunshine-vd`.
+## 🛠️ How it Works
 
-### Usage
+This tool is a specialized wrapper that bridges macOS native capabilities with the [Sunshine](https://app.lizardbyte.dev/Sunshine/) streaming server:
 
-Once installed, you can run the tool from any terminal window:
+1.  **Native Display Creation**: It uses a background daemon to talk to macOS APIs and create a "ghost" virtual monitor. No HDMI dummy plugs needed.
+2.  **Auto-Provisioning**: It automatically finds your Sunshine config and overwrites it to target the new virtual screen with optimized bitrate presets.
+3.  **Turbo USB Mode**: If it detects an Android device via cable, it automatically sets up a high-speed network tunnel (via Gnirehtet) and bumps the quality to **Cinematic** (60Mbps).
+4.  **Clean Teardown**: When you close the app (Ctrl+C), it's programmed to clean up after itself—destroying the virtual monitor and stopping the streams—so you don't end up with zombie displays.
+
+## 📖 Usage
 
 ```bash
-# Interactive Mode
+# Start the interactive menu
 sunshine-vd
 
-# Automated Mode (Cinematic quality if USB detected, otherwise Balanced)
+# Automation mode (great for startup scripts)
 sunshine-vd --ci
 ```
 
-### Cloning and Running (Development)
+## 🤝 Prerequisites
 
-If you want to contribute or run from source:
+- **macOS** (Intel or Apple Silicon)
+- **Sunshine** installed (`brew install sunshine`)
+- **Optional (Turbo USB)**: `brew install android-platform-tools gnirehtet`
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/marqp/sunshine-virtual-display.git
-cd sunshine-virtual-display
-
-# 2. Install dependencies (Requires Node.js 22+)
-npm install
-
-# 3. Run via tsx
-npx tsx index.ts
-```
-
-## 🧑‍💻 Development Commands
-
-This repository follows standard linting, formatting, and testing rules:
-
-```bash
-npm run format # Formats the code with Prettier
-npm run lint   # Checks code quality with ESLint
-npm run test   # Runs unit tests with Vitest
-npm run build  # Bundles the code for distribution
-```
-
-## 🤝 Contributing
-
-Feel free to open Issues and send Pull Requests! Suggestions for new presets and native setup refinements are highly welcome.
-
-## 📜 License
-
-Distributed under the GPL-3.0 license. See [LICENSE](LICENSE) for more information.
+---
+*Distributed under the GPL-3.0 license.*

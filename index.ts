@@ -1,9 +1,12 @@
-import prompts from 'prompts';
 import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+import { findSunshineBin, getAdbDeviceId } from './src/utils.js';
+import { runInteractiveMenu } from './src/cli.js';
+import { generateSunshineConfig } from './src/sunshine.js';
 
 /**
  * Compatibility for hybrid environments (Node.js/Bun) and ES modules (ESM).
@@ -11,63 +14,6 @@ import { fileURLToPath } from 'url';
  */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-/**
- * Dynamically looks for the Sunshine executable in the system.
- * Ideal for supporting installations via Homebrew, native package (.app), or manual build.
- */
-function findSunshineBin(): string {
-  try {
-    const binPath = execSync('which sunshine', { encoding: 'utf8' }).trim();
-    if (binPath) return binPath;
-  } catch {
-    /* Ignore if 'which' fails and move to fallbacks */
-  }
-
-  const commonPaths = [
-    '/opt/homebrew/bin/sunshine',
-    '/usr/local/bin/sunshine',
-    '/Applications/Sunshine.app/Contents/MacOS/sunshine',
-    '/opt/homebrew/opt/sunshine/bin/sunshine'
-  ];
-
-  for (const p of commonPaths) {
-    if (fs.existsSync(p)) return p;
-  }
-
-  throw new Error('Sunshine not found. Make sure it is installed or in your $PATH.');
-}
-
-/**
- * Detects if there is an Android device connected and authorized via ADB.
- * @returns The device ID or null if no device is found.
- */
-function getAdbDeviceId(): string | null {
-  try {
-    const output = execSync('adb devices', { encoding: 'utf8' }).trim();
-    const lines = output.split('\n');
-    // Look for the first line that contains an active and authorized device
-    const deviceLine = lines.find((line) => line.includes('\tdevice'));
-    if (deviceLine) {
-      return deviceLine.split('\t')[0].trim();
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Checks if the gnirehtet binary is installed in the system.
- */
-function hasGnirehtet(): boolean {
-  try {
-    execSync('which gnirehtet', { encoding: 'utf8' });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 const SUNSHINE_BIN = findSunshineBin();
 const SUNSHINE_CONF = path.join(os.homedir(), '.config/sunshine/sunshine.conf');
@@ -88,8 +34,6 @@ async function main() {
   const VIRTUAL_DISPLAY_NAME = 'Sunshine Virtual Display';
 
   // 1. Performance Optimization (Background Provisioning)
-  // Since the resolution is already known, we trigger the creation of the native virtual screen in parallel.
-  // This masks initialization latency while the user reads and chooses menu options.
   console.log('⏳ Provisioning virtual monitor in background...');
   const daemonPath = path.join(__dirname, 'display-daemon.js');
   const displayProcess = spawn(
@@ -104,11 +48,9 @@ async function main() {
 
   // Extract the native display ID from the C++ daemon process via IPC messages
   const waitForDisplay = new Promise<string>((resolve, reject) => {
-    // Flag to prevent late rejections from crashing the parent process
     let isResolved = false;
     let daemonLogs = '';
 
-    // Listen for messages emitted by the daemon via IPC channel
     displayProcess.on('message', (msg: any) => {
       if (isResolved) return;
 
@@ -125,7 +67,6 @@ async function main() {
 
     if (displayProcess.stderr) {
       displayProcess.stderr.on('data', (data) => {
-        // Buffer logs instead of printing immediately to keep the UI clean
         daemonLogs += data.toString();
       });
     }
@@ -139,7 +80,6 @@ async function main() {
     });
 
     displayProcess.on('exit', (code) => {
-      // We only consider it an error if it exited before giving us the success ID
       if (!isResolved) {
         isResolved = true;
         if (code !== 0 && daemonLogs) {
@@ -147,7 +87,6 @@ async function main() {
         }
         reject(new Error(`Display daemon exited prematurely with code ${code}`));
       } else {
-        // If the daemon closes *after* being resolved, cleanup will call exit after killing sunshine
         if (code !== 0 && code !== null) {
           console.log(`\n⚠️  Virtual monitor daemon closed (code ${code}).`);
         }
@@ -155,7 +94,6 @@ async function main() {
       }
     });
 
-    // 10s timeout (increased as user might take time in the menu)
     setTimeout(() => {
       if (!isResolved) {
         isResolved = true;
@@ -164,113 +102,24 @@ async function main() {
     }, 10000);
   });
 
-  // Check if Headless/CI mode was requested (skips interactive menu)
+  // Check if Headless/CI mode was requested
   const isCiMode = process.argv.includes('--ci');
-  let q;
-  let useUsbTethering = false;
-  let connectedDeviceId: string | null = null;
-  let enableAudio = false;
 
-  if (isCiMode) {
-    console.log('🤖 --ci mode active.');
+  const cliConfig = await runInteractiveMenu(isCiMode);
 
-    // 1.5. USB Tethering Check (Automated for CI)
-    const adbDeviceId = getAdbDeviceId();
-    const gnirehtetReady = hasGnirehtet();
-
-    if (adbDeviceId && gnirehtetReady) {
-      console.log(
-        '🔌 Android device detected. Automatically enabling Turbo USB Mode (Gnirehtet)...'
-      );
-      useUsbTethering = true;
-      connectedDeviceId = adbDeviceId;
-    }
-
-    if (useUsbTethering) {
-      console.log('✨ Turbo USB detected: Automatically selecting Cinematic profile...');
-      q = { minBit: 30000, maxBit: 60000, sw: 'medium' };
-    } else {
-      console.log('⚖️  Standard network: Automatically selecting Balanced profile...');
-      q = { minBit: 15000, maxBit: 30000, sw: 'fast' };
-    }
-  } else {
-    // 1.5. USB Tethering Check
-    const adbDeviceId = getAdbDeviceId();
-    const gnirehtetReady = hasGnirehtet();
-
-    if (adbDeviceId && gnirehtetReady) {
-      const tetherResponse = await prompts({
-        type: 'confirm',
-        name: 'useUsbTethering',
-        message: '🔌 Android device detected via cable. Enable Turbo USB Mode (Gnirehtet)?',
-        initial: true
-      });
-      useUsbTethering = tetherResponse.useUsbTethering;
-      if (useUsbTethering) connectedDeviceId = adbDeviceId;
-    } else if (adbDeviceId && !gnirehtetReady) {
-      console.log('🔌 Android device detected, but Gnirehtet is not installed.');
-      console.log('💡 Tip: Install with `brew install gnirehtet` to enable Turbo USB Mode.\n');
-    }
-
-    // 2. Interactive menu for streaming quality selection
-    const qualityResponse = await prompts({
-      type: 'select',
-      name: 'quality',
-      message: '✨ Select streaming quality:',
-      choices: [
-        {
-          title: '🎮 Competitive (Ultra Low Latency)',
-          value: { minBit: 5000, maxBit: 15000, sw: 'fast' }
-        },
-        {
-          title: '⚖️  Balanced (Smoothness & Clarity)',
-          value: { minBit: 15000, maxBit: 30000, sw: 'fast' }
-        },
-        {
-          title: '🍿 Cinematic (Maximum Quality)',
-          value: { minBit: 30000, maxBit: 60000, sw: 'medium' }
-        }
-      ],
-      initial: 1
-    });
-
-    if (!qualityResponse.quality) {
-      console.log('❌ Operation cancelled.');
-      if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
-      process.exit(1);
-    }
-
-    q = qualityResponse.quality;
-
-    // 2.5. Audio Sink Toggle
-    const audioResponse = await prompts({
-      type: 'toggle',
-      name: 'enableAudio',
-      message: '🔊 Stream Mac audio to tablet?',
-      initial: false,
-      active: 'yes',
-      inactive: 'no'
-    });
-
-    if (audioResponse.enableAudio === undefined) {
-      console.log('❌ Operation cancelled.');
-      if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
-      process.exit(1);
-    }
-    enableAudio = audioResponse.enableAudio;
+  if (!cliConfig) {
+    console.log('❌ Operation cancelled.');
+    if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
+    process.exit(1);
   }
+
+  const { q, useUsbTethering, connectedDeviceId, enableAudio } = cliConfig;
 
   console.log(`\n✅ Resolution: ${width}x${height} | Target Bitrate: ${q.maxBit / 1000}Mbps\n`);
 
   try {
-    // 3. Wait for initialization (if not already ready)
     displayId = await waitForDisplay;
     console.log(`✅ Monitor initialized natively! (CGDirectDisplayID: ${displayId})`);
-
-    /**
-     * Safety delay: macOS needs a brief moment to register the new display
-     * in the window server before Sunshine can correctly capture it.
-     */
     await new Promise((resolve) => setTimeout(resolve, 1500));
   } catch (err: any) {
     console.error(`❌ Error creating monitor: ${err.message}`);
@@ -278,26 +127,9 @@ async function main() {
     process.exit(1);
   }
 
-  // 3. Inject dynamic configuration into sunshine.conf (State of the art on macOS)
-  // Associate the stream directly with the newly created Virtual Display
   console.log('⚙️  Optimizing Sunshine via ScreenCaptureKit...');
 
-  // Note: min_bitrate is not supported in recent Sunshine versions.
-  // Bitrates are defined in Kbps.
-  const sunshineConfigLines = [
-    `output_name = ${displayId}`,
-    `max_bitrate = ${q.maxBit}`,
-    `sw_preset = ${q.sw}`,
-    `sw_tune = zerolatency`,
-    `min_log_level = info`
-  ];
-
-  if (!enableAudio) {
-    // Setting an invalid audio sink effectively disables audio streaming in Sunshine
-    sunshineConfigLines.push('audio_sink = disabled');
-  }
-
-  const sunshineConfig = sunshineConfigLines.join('\n');
+  const sunshineConfig = generateSunshineConfig(displayId, q.maxBit, q.sw, enableAudio);
 
   try {
     const configDir = path.dirname(SUNSHINE_CONF);
@@ -305,8 +137,6 @@ async function main() {
       fs.mkdirSync(configDir, { recursive: true });
     }
 
-    // Atomic Write:
-    // Write to a temp file first and rename to avoid file corruption
     const tempConfigPath = `${SUNSHINE_CONF}.tmp.${Date.now()}`;
     fs.writeFileSync(tempConfigPath, sunshineConfig);
     fs.renameSync(tempConfigPath, SUNSHINE_CONF);
@@ -316,21 +146,19 @@ async function main() {
     process.exit(1);
   }
 
-  // 4. Run Sunshine with the newly configured dynamic settings
   console.log('🚀 Starting Sunshine...\n');
 
-  // Kill any existing Sunshine instances to prevent port conflicts or config locks
   try {
     if (os.platform() === 'darwin') {
       execSync('killall sunshine 2>/dev/null || true');
-      execSync('sleep 1'); // Wait 1 second for the OS to release network sockets
+      execSync('sleep 1');
     }
   } catch {
-    /* Ignore errors if no process was found */
+    /* Ignore errors */
   }
 
   const sunshineProcess = spawn(SUNSHINE_BIN, [SUNSHINE_CONF], {
-    stdio: 'inherit' // Keep Sunshine logs in the current terminal for user debugging
+    stdio: 'inherit'
   });
 
   if (useUsbTethering) {
@@ -342,7 +170,6 @@ async function main() {
     if (gnirehtetProcess.stderr) {
       gnirehtetProcess.stderr.on('data', (data) => {
         const msg = data.toString();
-        // Log only important Gnirehtet messages to avoid flooding info
         if (msg.includes('Exception') || msg.includes('Error') || msg.includes('fail')) {
           console.error(`[Gnirehtet] ${msg.trim()}`);
         }
@@ -353,21 +180,15 @@ async function main() {
     console.log(' ℹ️  USB TUNNEL ACTIVE: Connect Moonlight to IP 10.0.2.2');
     console.log('======================================================\n');
 
-    /**
-     * Hardware Monitoring:
-     * Periodically checks if the USB cable was removed or if debugging was disabled.
-     * If the device ID disappears or changes, we shut everything down immediately for safety.
-     */
     unplugInterval = setInterval(() => {
       const currentId = getAdbDeviceId();
       if (!currentId || currentId !== connectedDeviceId) {
         console.log('\n🔌 USB cable disconnected. Closing session...');
         cleanup();
       }
-    }, 3000); // Check every 3 seconds
+    }, 3000);
   }
 
-  // 5. Teardown / Cleanup: Process termination
   let isShuttingDown = false;
 
   const cleanup = () => {
@@ -387,9 +208,8 @@ async function main() {
 
     if (sunshineProcess && !sunshineProcess.killed) {
       console.log('-> Requesting Sunshine shutdown...');
-      sunshineProcess.kill('SIGTERM'); // Try graceful shutdown first (Graceful Degradation)
+      sunshineProcess.kill('SIGTERM');
 
-      // Fallback to aggressive SIGKILL if Sunshine hangs longer than 2s
       setTimeout(() => {
         if (!sunshineProcess.killed) sunshineProcess.kill('SIGKILL');
       }, 2000);
@@ -400,18 +220,15 @@ async function main() {
       displayProcess.kill('SIGINT');
     }
 
-    // Give a small delay for processes to die gracefully in the OS
     setTimeout(() => {
       console.log('✅ Done. Goodbye!');
       process.exit(0);
     }, 500);
   };
 
-  // Intercept window closing or Ctrl+C to ensure correct teardown
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
 
-  // If Sunshine server exits on its own (crash), trigger general cleanup
   sunshineProcess.on('exit', () => {
     console.log('\n⚠️  Sunshine has been terminated.');
     cleanup();

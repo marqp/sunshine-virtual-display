@@ -44,30 +44,42 @@ This tool features a built-in **Turbo USB Mode** designed for scenarios where lo
 - [Sunshine](https://app.lizardbyte.dev/Sunshine/) installed (via Homebrew or .pkg)
 - **Optional (Turbo USB Mode):** `brew install android-platform-tools gnirehtet`
 
-### Using Standalone Binaries (Recommended)
+### Quick Installation (Standalone Binary)
 
-Download the latest version from the [Releases](https://github.com/marqp/sunshine-vd/releases) page and run:
+Install the latest version globally in one step (no Node.js required):
 
 ```bash
-chmod +x sunshine-virtual-display-arm64
-./sunshine-virtual-display-arm64
+curl -sSL https://raw.githubusercontent.com/marqp/sunshine-virtual-display/main/install.sh | bash
+```
+
+This script automatically detects your Mac's architecture, downloads the latest release, and installs it as `/usr/local/bin/sunshine-vd`.
+
+### Usage
+
+Once installed, you can run the tool from any terminal window:
+
+```bash
+# Interactive Mode
+sunshine-vd
+
+# Automated Mode (Cinematic quality if USB detected, otherwise Balanced)
+sunshine-vd --ci
 ```
 
 ### Cloning and Running (Development)
 
+If you want to contribute or run from source:
+
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/sunshine-vd.git
-cd sunshine-vd
+git clone https://github.com/marqp/sunshine-virtual-display.git
+cd sunshine-virtual-display
 
-# 2. Install dependencies
+# 2. Install dependencies (Requires Node.js 22+)
 npm install
 
-# 3. Interactive Mode
+# 3. Run via tsx
 npx tsx index.ts
-
-# OR Automated Mode
-npx tsx index.ts --ci
 ```
 
 ## 🧑‍💻 Development Commands

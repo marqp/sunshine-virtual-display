@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { findSunshineBin, getAdbDeviceId, hasGnirehtet } from './utils.js';
 import { exec } from 'child_process';
 import { access } from 'fs/promises';
@@ -19,11 +19,18 @@ describe('System Utilities (src/utils.ts)', () => {
     delete process.env.SUNSHINE_BIN_PATH;
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('findSunshineBin', () => {
     it('should return SUNSHINE_BIN_PATH if environment variable is set', async () => {
       process.env.SUNSHINE_BIN_PATH = '/custom/path/sunshine';
       const bin = await findSunshineBin();
       expect(bin).toBe('/custom/path/sunshine');
+
+      // Ensure it doesn't try to call 'which' if env var is set
+      expect(exec).not.toHaveBeenCalled();
     });
 
     it('should return path from "which" if available', async () => {

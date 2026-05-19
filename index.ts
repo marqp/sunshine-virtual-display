@@ -3,6 +3,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import ora from 'ora';
+import { green, red, yellow, cyan } from 'kleur/colors';
 
 import { findSunshineBin, getAdbDeviceId } from './src/utils.js';
 import { runInteractiveMenu } from './src/cli.js';
@@ -15,17 +17,17 @@ import { generateSunshineConfig } from './src/sunshine.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SUNSHINE_BIN = findSunshineBin();
 const SUNSHINE_CONF = path.join(os.homedir(), '.config/sunshine/sunshine.conf');
 
 let gnirehtetProcess: ReturnType<typeof spawn> | null = null;
 
 async function main() {
   console.clear();
-  console.log('=========================================');
-  console.log(' ☀️ Sunshine Native Auto-Provision (TS) ☀️ ');
-  console.log('=========================================\n');
+  console.log(cyan('========================================='));
+  console.log(cyan(' ☀️ Sunshine Native Auto-Provision (TS) ☀️ '));
+  console.log(cyan('=========================================\n'));
 
+  const SUNSHINE_BIN = await findSunshineBin();
   let unplugInterval: NodeJS.Timeout | null = null;
 
   // We fix the resolution at 1080p. Fine-tuning is done via macOS System Settings
@@ -34,7 +36,7 @@ async function main() {
   const VIRTUAL_DISPLAY_NAME = 'Sunshine Virtual Display';
 
   // 1. Performance Optimization (Background Provisioning)
-  console.log('⏳ Provisioning virtual monitor in background...');
+  console.log(cyan('⏳ Provisioning virtual monitor in background...'));
   const daemonPath = path.join(__dirname, 'display-daemon.js');
   const displayProcess = spawn(
     'node',
@@ -59,8 +61,7 @@ async function main() {
         resolve(msg.id.toString());
       } else if (msg.type === 'ERROR') {
         isResolved = true;
-        console.error(`\n❌ Daemon Error: ${msg.message}`);
-        if (daemonLogs) console.error(`\n[Daemon Debug Logs]:\n${daemonLogs}`);
+        if (daemonLogs) console.error(red(`\n[Daemon Debug Logs]:\n${daemonLogs}`));
         reject(new Error(msg.message));
       }
     });
@@ -74,7 +75,7 @@ async function main() {
     displayProcess.on('error', (err) => {
       if (!isResolved) {
         isResolved = true;
-        if (daemonLogs) console.error(`\n[Daemon Debug Logs]:\n${daemonLogs}`);
+        if (daemonLogs) console.error(red(`\n[Daemon Debug Logs]:\n${daemonLogs}`));
         reject(err);
       }
     });
@@ -83,12 +84,12 @@ async function main() {
       if (!isResolved) {
         isResolved = true;
         if (code !== 0 && daemonLogs) {
-          console.error(`\n[Daemon Debug Logs]:\n${daemonLogs}`);
+          console.error(red(`\n[Daemon Debug Logs]:\n${daemonLogs}`));
         }
         reject(new Error(`Display daemon exited prematurely with code ${code}`));
       } else {
         if (code !== 0 && code !== null) {
-          console.log(`\n⚠️  Virtual monitor daemon closed (code ${code}).`);
+          console.log(yellow(`\n⚠️  Virtual monitor daemon closed (code ${code}).`));
         }
         if (typeof cleanup === 'function') cleanup();
       }
@@ -108,26 +109,29 @@ async function main() {
   const cliConfig = await runInteractiveMenu(isCiMode);
 
   if (!cliConfig) {
-    console.log('❌ Operation cancelled.');
+    console.log(red('❌ Operation cancelled.'));
     if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
     process.exit(1);
   }
 
   const { q, useUsbTethering, connectedDeviceId, enableAudio } = cliConfig;
 
-  console.log(`\n✅ Resolution: ${width}x${height} | Target Bitrate: ${q.maxBit / 1000}Mbps\n`);
+  console.log(
+    green(`\n✅ Resolution: ${width}x${height} | Target Bitrate: ${q.maxBit / 1000}Mbps\n`)
+  );
 
+  const spinner = ora('Finalizing monitor initialization...').start();
   try {
     displayId = await waitForDisplay;
-    console.log(`✅ Monitor initialized natively! (CGDirectDisplayID: ${displayId})`);
+    spinner.succeed(green(`Monitor initialized natively! (ID: ${displayId})`));
     await new Promise((resolve) => setTimeout(resolve, 1500));
   } catch (err: any) {
-    console.error(`❌ Error creating monitor: ${err.message}`);
+    spinner.fail(red(`Error creating monitor: ${err.message}`));
     if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
     process.exit(1);
   }
 
-  console.log('⚙️  Optimizing Sunshine via ScreenCaptureKit...');
+  console.log(cyan('⚙️  Optimizing Sunshine via ScreenCaptureKit...'));
 
   const sunshineConfig = generateSunshineConfig(displayId, q.maxBit, q.sw, enableAudio);
 
@@ -141,12 +145,12 @@ async function main() {
     fs.writeFileSync(tempConfigPath, sunshineConfig);
     fs.renameSync(tempConfigPath, SUNSHINE_CONF);
   } catch (err: any) {
-    console.error(`❌ Error saving configuration: ${err.message}`);
+    console.error(red(`❌ Error saving configuration: ${err.message}`));
     if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
     process.exit(1);
   }
 
-  console.log('🚀 Starting Sunshine...\n');
+  console.log(green('🚀 Starting Sunshine...\n'));
 
   try {
     if (os.platform() === 'darwin') {
@@ -162,7 +166,7 @@ async function main() {
   });
 
   if (useUsbTethering) {
-    console.log('🔌 Starting USB tunnel (Gnirehtet)...');
+    console.log(cyan('🔌 Starting USB tunnel (Gnirehtet)...'));
     gnirehtetProcess = spawn('gnirehtet', ['run'], {
       stdio: ['ignore', 'pipe', 'pipe']
     });
@@ -171,19 +175,19 @@ async function main() {
       gnirehtetProcess.stderr.on('data', (data) => {
         const msg = data.toString();
         if (msg.includes('Exception') || msg.includes('Error') || msg.includes('fail')) {
-          console.error(`[Gnirehtet] ${msg.trim()}`);
+          console.error(red(`[Gnirehtet] ${msg.trim()}`));
         }
       });
     }
 
-    console.log('\n======================================================');
-    console.log(' ℹ️  USB TUNNEL ACTIVE: Connect Moonlight to IP 10.0.2.2');
-    console.log('======================================================\n');
+    console.log(cyan('\n======================================================'));
+    console.log(cyan(' ℹ️  USB TUNNEL ACTIVE: Connect Moonlight to IP 10.0.2.2'));
+    console.log(cyan('======================================================\n'));
 
-    unplugInterval = setInterval(() => {
-      const currentId = getAdbDeviceId();
+    unplugInterval = setInterval(async () => {
+      const currentId = await getAdbDeviceId();
       if (!currentId || currentId !== connectedDeviceId) {
-        console.log('\n🔌 USB cable disconnected. Closing session...');
+        console.log(red('\n🔌 USB cable disconnected. Closing session...'));
         cleanup();
       }
     }, 3000);
@@ -197,17 +201,17 @@ async function main() {
 
     if (unplugInterval) clearInterval(unplugInterval);
 
-    console.log('\n=========================================');
-    console.log(' 🧹 Closing processes and cleaning up... ');
-    console.log('=========================================');
+    console.log(red('\n========================================='));
+    console.log(red(' 🧹 Closing processes and cleaning up... '));
+    console.log(red('========================================='));
 
     if (gnirehtetProcess && !gnirehtetProcess.killed) {
-      console.log('-> Closing USB tunnel (Gnirehtet)...');
+      console.log(yellow('-> Closing USB tunnel (Gnirehtet)...'));
       gnirehtetProcess.kill('SIGINT');
     }
 
     if (sunshineProcess && !sunshineProcess.killed) {
-      console.log('-> Requesting Sunshine shutdown...');
+      console.log(yellow('-> Requesting Sunshine shutdown...'));
       sunshineProcess.kill('SIGTERM');
 
       setTimeout(() => {
@@ -216,12 +220,12 @@ async function main() {
     }
 
     if (displayProcess && !displayProcess.killed) {
-      console.log('-> Destroying native virtual display...');
+      console.log(yellow('-> Destroying native virtual display...'));
       displayProcess.kill('SIGINT');
     }
 
     setTimeout(() => {
-      console.log('✅ Done. Goodbye!');
+      console.log(green('✅ Done. Goodbye!'));
       process.exit(0);
     }, 500);
   };
@@ -230,12 +234,12 @@ async function main() {
   process.on('SIGTERM', cleanup);
 
   sunshineProcess.on('exit', () => {
-    console.log('\n⚠️  Sunshine has been terminated.');
+    console.log(yellow('\n⚠️  Sunshine has been terminated.'));
     cleanup();
   });
 }
 
 main().catch((err) => {
-  console.error('Unhandled error:', err);
+  console.error(red('Unhandled error:'), err);
   process.exit(1);
 });

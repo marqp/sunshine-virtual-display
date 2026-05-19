@@ -1,13 +1,17 @@
-import { execSync } from 'child_process';
-import fs from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { access } from 'fs/promises';
+
+const execPromise = promisify(exec);
 
 /**
  * Dynamically looks for the Sunshine executable in the system.
  * Ideal for supporting installations via Homebrew, native package (.app), or manual build.
  */
-export function findSunshineBin(): string {
+export async function findSunshineBin(): Promise<string> {
   try {
-    const binPath = execSync('which sunshine', { encoding: 'utf8' }).trim();
+    const { stdout } = await execPromise('which sunshine');
+    const binPath = stdout.trim();
     if (binPath) return binPath;
   } catch {
     /* Ignore if 'which' fails and move to fallbacks */
@@ -21,7 +25,12 @@ export function findSunshineBin(): string {
   ];
 
   for (const p of commonPaths) {
-    if (fs.existsSync(p)) return p;
+    try {
+      await access(p);
+      return p;
+    } catch {
+      /* Continue to next path */
+    }
   }
 
   throw new Error('Sunshine not found. Make sure it is installed or in your $PATH.');
@@ -31,10 +40,10 @@ export function findSunshineBin(): string {
  * Detects if there is an Android device connected and authorized via ADB.
  * @returns The device ID or null if no device is found.
  */
-export function getAdbDeviceId(): string | null {
+export async function getAdbDeviceId(): Promise<string | null> {
   try {
-    const output = execSync('adb devices', { encoding: 'utf8' }).trim();
-    const lines = output.split('\n');
+    const { stdout } = await execPromise('adb devices');
+    const lines = stdout.trim().split('\n');
     // Look for the first line that contains an active and authorized device
     const deviceLine = lines.find((line) => line.includes('\tdevice'));
     if (deviceLine) {
@@ -49,9 +58,9 @@ export function getAdbDeviceId(): string | null {
 /**
  * Checks if the gnirehtet binary is installed in the system.
  */
-export function hasGnirehtet(): boolean {
+export async function hasGnirehtet(): Promise<boolean> {
   try {
-    execSync('which gnirehtet', { encoding: 'utf8' });
+    await execPromise('which gnirehtet');
     return true;
   } catch {
     return false;

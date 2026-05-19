@@ -1,4 +1,5 @@
 import prompts from 'prompts';
+import { cyan, green, yellow } from 'kleur/colors';
 import { getAdbDeviceId, hasGnirehtet } from './utils.js';
 
 export interface CliConfig {
@@ -16,31 +17,31 @@ export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig |
   let enableAudio = false;
 
   if (isCiMode) {
-    console.log('🤖 --ci mode active.');
+    console.log(cyan('🤖 --ci mode active.'));
 
     // 1.5. USB Tethering Check (Automated for CI)
-    const adbDeviceId = getAdbDeviceId();
-    const gnirehtetReady = hasGnirehtet();
+    const adbDeviceId = await getAdbDeviceId();
+    const gnirehtetReady = await hasGnirehtet();
 
     if (adbDeviceId && gnirehtetReady) {
       console.log(
-        '🔌 Android device detected. Automatically enabling Turbo USB Mode (Gnirehtet)...'
+        green('🔌 Android device detected. Automatically enabling Turbo USB Mode (Gnirehtet)...')
       );
       useUsbTethering = true;
       connectedDeviceId = adbDeviceId;
     }
 
     if (useUsbTethering) {
-      console.log('✨ Turbo USB detected: Automatically selecting Cinematic profile...');
+      console.log(cyan('✨ Turbo USB detected: Automatically selecting Cinematic profile...'));
       q = { minBit: 30000, maxBit: 60000, sw: 'medium' };
     } else {
-      console.log('⚖️  Standard network: Automatically selecting Balanced profile...');
+      console.log(cyan('⚖️  Standard network: Automatically selecting Balanced profile...'));
       q = { minBit: 15000, maxBit: 30000, sw: 'fast' };
     }
   } else {
     // 1.5. USB Tethering Check
-    const adbDeviceId = getAdbDeviceId();
-    const gnirehtetReady = hasGnirehtet();
+    const adbDeviceId = await getAdbDeviceId();
+    const gnirehtetReady = await hasGnirehtet();
 
     if (adbDeviceId && gnirehtetReady) {
       const tetherResponse = await prompts({
@@ -52,8 +53,10 @@ export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig |
       useUsbTethering = tetherResponse.useUsbTethering;
       if (useUsbTethering) connectedDeviceId = adbDeviceId;
     } else if (adbDeviceId && !gnirehtetReady) {
-      console.log('🔌 Android device detected, but Gnirehtet is not installed.');
-      console.log('💡 Tip: Install with `brew install gnirehtet` to enable Turbo USB Mode.\n');
+      console.log(yellow('🔌 Android device detected, but Gnirehtet is not installed.'));
+      console.log(
+        cyan('💡 Tip: Install with `brew install gnirehtet` to enable Turbo USB Mode.\n')
+      );
     }
 
     // 2. Interactive menu for streaming quality selection

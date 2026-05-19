@@ -19,12 +19,15 @@
   "license": "GPL-3.0-only",
   "type": "module",
   "dependencies": {
+    "kleur": "^4.1.5",
     "node-mac-virtual-display": "^1.0.13",
+    "ora": "^9.4.0",
     "prompts": "^2.4.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.8.0",
+    "@types/ora": "^3.1.0",
     "@types/prompts": "^2.4.9",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",

@@ -12,9 +12,9 @@ describe('ProcessManager (src/process-manager.ts)', () => {
     vi.useFakeTimers();
     // Mock process.exit
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
-    
+
     pm = new ProcessManager();
-    
+
     // Create a mock ChildProcess
     mockProcess = new EventEmitter();
     mockProcess.kill = vi.fn();
@@ -59,7 +59,7 @@ describe('ProcessManager (src/process-manager.ts)', () => {
   it('should register OS signal listeners on instantiation', () => {
     const onSpy = vi.spyOn(process, 'on');
     new ProcessManager();
-    
+
     expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
     expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
   });
@@ -67,9 +67,9 @@ describe('ProcessManager (src/process-manager.ts)', () => {
   it('should trigger teardown when sunshine process exits unexpectedly', () => {
     const teardownSpy = vi.spyOn(pm, 'teardown');
     pm.registerSunshine(mockProcess as unknown as ChildProcess);
-    
+
     mockProcess.emit('exit');
-    
+
     expect(teardownSpy).toHaveBeenCalled();
   });
 });

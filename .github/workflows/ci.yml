@@ -1,0 +1,92 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # 1. Job de Integração Contínua (CI)
+  # Valida a qualidade do código e executa testes unitários em ambiente Linux (mais rápido).
+  ci:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Lint
+        run: npm run lint
+
+      - name: Run Tests
+        run: npm run test
+
+  # 2. Job de Entrega Contínua (CD)
+  # Compila os binários nativos para macOS e publica no GitHub Releases.
+  # Só executa em pushes na branch main após o CI passar.
+  cd:
+    name: Build & Release (macOS)
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: macos-latest # Runner obrigatório para compilar módulos nativos do macOS
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22 # Usando Node 22 para compatibilidade com o target do pkg
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Version Tag
+        shell: bash
+        # Gera a versão dinamicamente no formato: vYYYYMMDD-HHMMSS (Ex: v20260518-234512)
+        # O fuso horário padrão do GitHub Actions é UTC.
+        run: |
+          VERSION_TAG="v$(date +'%Y%m%d-%H%M%S')"
+          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
+
+      - name: Build Bundle (esbuild)
+        # Consolida o TypeScript em CommonJS (.cjs) para compatibilidade com pkg
+        run: npm run build
+
+      - name: Generate Binaries (pkg)
+        # Gera executáveis estáticos para x64 e arm64
+        run: npm run package
+
+      - name: Prepare Assets
+        shell: bash
+        # Renomeia os binários para seguir rigorosamente o padrão solicitado
+        run: |
+          mv bin/sunshine-virtual-display-x64 bin/sunshine-vd-macos-x64-${{ env.VERSION_TAG }}
+          mv bin/sunshine-virtual-display-arm64 bin/sunshine-vd-macos-arm64-${{ env.VERSION_TAG }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION_TAG }}
+          name: Release ${{ env.VERSION_TAG }}
+          draft: false
+          prerelease: false
+          # Inclui os binários renomeados na release
+          files: |
+            bin/sunshine-vd-macos-x64-${{ env.VERSION_TAG }}
+            bin/sunshine-vd-macos-arm64-${{ env.VERSION_TAG }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,8 +1,6 @@
-import { spawn, execSync } from 'child_process';
+import { spawn, fork, execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import ora from 'ora';
 import { green, red, yellow, cyan } from 'kleur/colors';
 
 import { findSunshineBin, getAdbDeviceId } from './src/utils.js';
@@ -10,15 +8,27 @@ import { runInteractiveMenu } from './src/cli.js';
 import { generateSunshineConfig } from './src/sunshine.js';
 import { writeSunshineConfigAtomic } from './src/io.js';
 import { ProcessManager } from './src/process-manager.js';
+import { runDaemon } from './src/daemon.js';
 
 /**
  * Compatibility for hybrid environments (Node.js/Bun) and ES modules (ESM).
- * Resolves __filename and __dirname as they don't exist natively in ESM scope.
+ * Resolves current filename without relying on import.meta in bundled CJS.
  */
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const SUNSHINE_CONF = path.join(os.homedir(), '.config/sunshine/sunshine.conf');
+
+/**
+ * Entry point logic.
+ * If the --daemon-mode flag is present, it runs the virtual display logic.
+ * Otherwise, it runs the main CLI orchestrator.
+ */
+if (process.argv.includes('--daemon-mode')) {
+  runDaemon();
+} else {
+  main().catch((err) => {
+    console.error(red('Unhandled error:'), err);
+    process.exit(1);
+  });
+}
 
 async function main() {
   console.clear();
@@ -38,10 +48,14 @@ async function main() {
 
   // 1. Performance Optimization (Background Provisioning)
   console.log(cyan('⏳ Provisioning virtual monitor in background...'));
-  const daemonPath = path.join(__dirname, 'display-daemon.js');
-  const displayProcess = spawn(
-    'node',
-    [daemonPath, width.toString(), height.toString(), VIRTUAL_DISPLAY_NAME],
+
+  // Standalone Binary Strategy:
+  // We fork the current process with the --daemon-mode flag.
+  // Using fork() with process.argv[1] is the standard way to spawn
+  // a child that runs the same code in a pkg environment.
+  const displayProcess = fork(
+    process.argv[1],
+    ['--daemon-mode', width.toString(), height.toString(), VIRTUAL_DISPLAY_NAME],
     {
       stdio: ['ignore', 'pipe', 'pipe', 'ipc']
     }
@@ -93,7 +107,6 @@ async function main() {
         if (code !== 0 && code !== null) {
           console.log(yellow(`\n⚠️  Virtual monitor daemon closed (code ${code}).`));
         }
-        // Cleanup is handled by ProcessManager via SIGINT/SIGTERM or explicit call
       }
     });
 
@@ -122,13 +135,13 @@ async function main() {
     green(`\n✅ Resolution: ${width}x${height} | Target Bitrate: ${q.maxBit / 1000}Mbps\n`)
   );
 
-  const spinner = ora('Finalizing monitor initialization...').start();
+  console.log(cyan('⏳ Finalizing monitor initialization...'));
   try {
     displayId = await waitForDisplay;
-    spinner.succeed(green(`Monitor initialized natively! (ID: ${displayId})`));
+    console.log(green(`✅ Monitor initialized natively! (ID: ${displayId})`));
     await new Promise((resolve) => setTimeout(resolve, 1500));
   } catch (err: any) {
-    spinner.fail(red(`Error creating monitor: ${err.message}`));
+    console.error(red(`❌ Error creating monitor: ${err.message}`));
     pm.teardown();
     return;
   }
@@ -191,8 +204,3 @@ async function main() {
     pm.setUsbMonitor(unplugInterval);
   }
 }
-
-main().catch((err) => {
-  console.error(red('Unhandled error:'), err);
-  process.exit(1);
-});

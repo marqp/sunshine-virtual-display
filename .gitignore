@@ -19,6 +19,7 @@ yarn-error.log*
 # Build/TypeScript output (if any)
 dist/
 out/
+bin/
 coverage/
 *.tsbuildinfo
 

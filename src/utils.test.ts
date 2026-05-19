@@ -34,16 +34,16 @@ describe('System Utilities (src/utils.ts)', () => {
     });
 
     it('should return path from "which" if available', async () => {
-      // @ts-expect-error - exec mock implementation
-      vi.mocked(exec).mockImplementation((cmd, cb) => cb(null, { stdout: '/usr/bin/sunshine' }));
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(null, { stdout: '/usr/bin/sunshine' })) as any);
 
       const bin = await findSunshineBin();
       expect(bin).toBe('/usr/bin/sunshine');
     });
 
     it('should fall back to common paths if "which" fails', async () => {
-      // @ts-expect-error - exec mock implementation
-      vi.mocked(exec).mockImplementation((cmd, cb) => cb(new Error('not found')));
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(new Error('not found'))) as any);
 
       // Mock second path in commonPaths to succeed
       // commonPaths[0] = /opt/homebrew/bin/sunshine
@@ -56,8 +56,8 @@ describe('System Utilities (src/utils.ts)', () => {
     });
 
     it('should throw error if no binary is found anywhere', async () => {
-      // @ts-expect-error - exec mock implementation
-      vi.mocked(exec).mockImplementation((cmd, cb) => cb(new Error('not found')));
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(new Error('not found'))) as any);
       vi.mocked(access).mockRejectedValue(new Error('no'));
 
       await expect(findSunshineBin()).rejects.toThrow('Sunshine not found');
@@ -67,8 +67,8 @@ describe('System Utilities (src/utils.ts)', () => {
   describe('getAdbDeviceId', () => {
     it('should return device ID when an authorized device is connected', async () => {
       const mockOutput = 'List of devices attached\nABC123\tdevice\n';
-      // @ts-expect-error - exec mock implementation
-      vi.mocked(exec).mockImplementation((cmd, cb) => cb(null, { stdout: mockOutput }));
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(null, { stdout: mockOutput })) as any);
 
       const deviceId = await getAdbDeviceId();
       expect(deviceId).toBe('ABC123');
@@ -76,16 +76,16 @@ describe('System Utilities (src/utils.ts)', () => {
 
     it('should return null when no device is connected', async () => {
       const mockOutput = 'List of devices attached\n';
-      // @ts-expect-error - exec mock implementation
-      vi.mocked(exec).mockImplementation((cmd, cb) => cb(null, { stdout: mockOutput }));
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(null, { stdout: mockOutput })) as any);
 
       const deviceId = await getAdbDeviceId();
       expect(deviceId).toBeNull();
     });
 
     it('should return null if adb command fails', async () => {
-      // @ts-expect-error - exec mock implementation
-      vi.mocked(exec).mockImplementation((cmd, cb) => cb(new Error('ADB not found')));
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(new Error('ADB not found'))) as any);
 
       const deviceId = await getAdbDeviceId();
       expect(deviceId).toBeNull();
@@ -94,18 +94,16 @@ describe('System Utilities (src/utils.ts)', () => {
 
   describe('hasGnirehtet', () => {
     it('should return true if gnirehtet is installed', async () => {
-      // @ts-expect-error - exec mock implementation
-      vi.mocked(exec).mockImplementation((cmd, cb) =>
-        cb(null, { stdout: '/usr/local/bin/gnirehtet' })
-      );
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(null, { stdout: '/usr/local/bin/gnirehtet' })) as any);
 
       const result = await hasGnirehtet();
       expect(result).toBe(true);
     });
 
     it('should return false if gnirehtet is missing', async () => {
-      // @ts-expect-error - exec mock implementation
-      vi.mocked(exec).mockImplementation((cmd, cb) => cb(new Error('command not found')));
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(new Error('command not found'))) as any);
 
       const result = await hasGnirehtet();
       expect(result).toBe(false);

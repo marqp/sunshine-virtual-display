@@ -169,10 +169,30 @@ async function main() {
   let q;
   let useUsbTethering = false;
   let connectedDeviceId: string | null = null;
+  let enableAudio = false;
 
   if (isCiMode) {
-    console.log('🤖 --ci mode active. Automatically selecting Balanced profile...');
-    q = { minBit: 15000, maxBit: 30000, sw: 'fast' };
+    console.log('🤖 --ci mode active.');
+
+    // 1.5. USB Tethering Check (Automated for CI)
+    const adbDeviceId = getAdbDeviceId();
+    const gnirehtetReady = hasGnirehtet();
+
+    if (adbDeviceId && gnirehtetReady) {
+      console.log(
+        '🔌 Android device detected. Automatically enabling Turbo USB Mode (Gnirehtet)...'
+      );
+      useUsbTethering = true;
+      connectedDeviceId = adbDeviceId;
+    }
+
+    if (useUsbTethering) {
+      console.log('✨ Turbo USB detected: Automatically selecting Cinematic profile...');
+      q = { minBit: 30000, maxBit: 60000, sw: 'medium' };
+    } else {
+      console.log('⚖️  Standard network: Automatically selecting Balanced profile...');
+      q = { minBit: 15000, maxBit: 30000, sw: 'fast' };
+    }
   } else {
     // 1.5. USB Tethering Check
     const adbDeviceId = getAdbDeviceId();
@@ -221,6 +241,23 @@ async function main() {
     }
 
     q = qualityResponse.quality;
+
+    // 2.5. Audio Sink Toggle
+    const audioResponse = await prompts({
+      type: 'toggle',
+      name: 'enableAudio',
+      message: '🔊 Stream Mac audio to tablet?',
+      initial: false,
+      active: 'yes',
+      inactive: 'no'
+    });
+
+    if (audioResponse.enableAudio === undefined) {
+      console.log('❌ Operation cancelled.');
+      if (displayProcess && !displayProcess.killed) displayProcess.kill('SIGINT');
+      process.exit(1);
+    }
+    enableAudio = audioResponse.enableAudio;
   }
 
   console.log(`\n✅ Resolution: ${width}x${height} | Target Bitrate: ${q.maxBit / 1000}Mbps\n`);
@@ -247,13 +284,20 @@ async function main() {
 
   // Note: min_bitrate is not supported in recent Sunshine versions.
   // Bitrates are defined in Kbps.
-  const sunshineConfig = [
+  const sunshineConfigLines = [
     `output_name = ${displayId}`,
     `max_bitrate = ${q.maxBit}`,
     `sw_preset = ${q.sw}`,
     `sw_tune = zerolatency`,
     `min_log_level = info`
-  ].join('\n');
+  ];
+
+  if (!enableAudio) {
+    // Setting an invalid audio sink effectively disables audio streaming in Sunshine
+    sunshineConfigLines.push('audio_sink = disabled');
+  }
+
+  const sunshineConfig = sunshineConfigLines.join('\n');
 
   try {
     const configDir = path.dirname(SUNSHINE_CONF);

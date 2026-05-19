@@ -22,17 +22,20 @@ An interactive command-line wrapper (CLI) built with Node.js/TypeScript to creat
 This tool features a built-in **Turbo USB Mode** designed for scenarios where local Wi-Fi is unstable, ports are blocked by firewalls, or ultra-low latency is required.
 
 ### Why use it?
+
 - **Bypass Firewalls**: Works even if your router blocks Sunshine's ports (e.g., in hotels or universities).
 - **Reduced Latency**: Eliminates Wi-Fi jitter and interference.
 - **Privacy**: Streaming data stays strictly on the USB cable.
 
 ### How it works
+
 1. **Detection**: The CLI checks for an Android device with **USB Debugging** enabled.
 2. **Reverse Tethering**: It spawns a `gnirehtet` instance, which creates a virtual network tunnel over ADB.
 3. **Auto-Connection**: You connect Moonlight to the static IP `10.0.2.2`.
 4. **Safety Lock**: The program monitors the physical connection. If you unplug the cable, the entire streaming session (including the virtual display) is automatically torn down to save power and maintain privacy.
 
 ### Troubleshooting
+
 - **Device not detected?** Ensure "USB Debugging" is ON in Android Developer Options.
 - **Connection failed?** Make sure you accepted the VPN prompt on your Android screen.
 - **Tools missing?** Run `brew install android-platform-tools gnirehtet`.
@@ -63,7 +66,7 @@ npx tsx index.ts
 npx tsx index.ts --ci
 ```
 
-*(Tip: For faster startup, you can run with `bun run index.ts`)*
+_(Tip: For faster startup, you can run with `bun run index.ts`)_
 
 ## 🧑‍💻 Development Commands
 

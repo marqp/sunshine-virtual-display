@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { findSunshineBin, getAdbDeviceId, hasGnirehtet } from './utils.js';
+import {
+  findSunshineBin,
+  getAdbDeviceId,
+  hasGnirehtet,
+  isMoonlightInstalled,
+  launchMoonlight
+} from './utils.js';
 import { exec } from 'child_process';
 import { access } from 'fs/promises';
 
@@ -46,8 +52,6 @@ describe('System Utilities (src/utils.ts)', () => {
         cb(new Error('not found'))) as any);
 
       // Mock second path in commonPaths to succeed
-      // commonPaths[0] = /opt/homebrew/bin/sunshine
-      // commonPaths[1] = /usr/local/bin/sunshine
       vi.mocked(access).mockRejectedValueOnce(new Error('no')).mockResolvedValueOnce(undefined);
 
       const bin = await findSunshineBin();
@@ -107,6 +111,41 @@ describe('System Utilities (src/utils.ts)', () => {
 
       const result = await hasGnirehtet();
       expect(result).toBe(false);
+    });
+  });
+
+  describe('isMoonlightInstalled', () => {
+    it('should return true if Moonlight is found', async () => {
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(null, { stdout: 'package:com.limelight' })) as any);
+
+      const result = await isMoonlightInstalled('SERIAL123');
+      expect(result).toBe(true);
+      expect(exec).toHaveBeenCalledWith(
+        expect.stringContaining('shell pm list packages com.limelight'),
+        expect.any(Function)
+      );
+    });
+
+    it('should return false if Moonlight is not found', async () => {
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(null, { stdout: '' })) as any);
+
+      const result = await isMoonlightInstalled('SERIAL123');
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('launchMoonlight', () => {
+    it('should call monkey launch command', async () => {
+      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+        cb(null, { stdout: 'OK' })) as any);
+
+      await launchMoonlight('SERIAL123');
+      expect(exec).toHaveBeenCalledWith(
+        expect.stringContaining('shell monkey -p com.limelight'),
+        expect.any(Function)
+      );
     });
   });
 });

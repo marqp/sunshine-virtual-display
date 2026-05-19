@@ -71,3 +71,28 @@ export async function hasGnirehtet(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Checks if the Moonlight app is installed on the given Android device.
+ */
+export async function isMoonlightInstalled(deviceId: string): Promise<boolean> {
+  try {
+    const { stdout } = await execPromise(`adb -s ${deviceId} shell pm list packages com.limelight`);
+    return stdout.includes('package:com.limelight');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Launches the Moonlight app on the given Android device using the monkey tool.
+ */
+export async function launchMoonlight(deviceId: string): Promise<void> {
+  try {
+    await execPromise(
+      `adb -s ${deviceId} shell monkey -p com.limelight -c android.intent.category.LAUNCHER 1`
+    );
+  } catch {
+    /* Ignore failures to launch */
+  }
+}

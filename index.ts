@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { green, red, yellow, cyan } from 'kleur/colors';
 
-import { findSunshineBin, getAdbDeviceId } from './src/utils.js';
+import { findSunshineBin, getAdbDeviceId, launchMoonlight } from './src/utils.js';
 import { runInteractiveMenu } from './src/cli.js';
 import { generateSunshineConfig } from './src/sunshine.js';
 import { writeSunshineConfigAtomic } from './src/io.js';
@@ -129,7 +129,7 @@ async function main() {
     return;
   }
 
-  const { q, useUsbTethering, connectedDeviceId, enableAudio } = cliConfig;
+  const { q, useUsbTethering, connectedDeviceId, enableAudio, autoLaunchMoonlight } = cliConfig;
 
   console.log(
     green(`\n✅ Resolution: ${width}x${height} | Target Bitrate: ${q.maxBit / 1000}Mbps\n`)
@@ -202,5 +202,11 @@ async function main() {
       }
     }, 3000);
     pm.setUsbMonitor(unplugInterval);
+  }
+
+  // 4. Moonlight Auto-Launch (If requested)
+  if (autoLaunchMoonlight && connectedDeviceId) {
+    console.log(cyan('🚀 Launching Moonlight on tablet...'));
+    await launchMoonlight(connectedDeviceId);
   }
 }

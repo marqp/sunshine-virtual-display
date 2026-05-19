@@ -1,6 +1,6 @@
 import prompts from 'prompts';
 import { cyan, green, yellow } from 'kleur/colors';
-import { getAdbDeviceId, hasGnirehtet } from './utils.js';
+import { getAdbDeviceId, hasGnirehtet, isMoonlightInstalled } from './utils.js';
 
 export interface CliConfig {
   q: { minBit: number; maxBit: number; sw: string };
@@ -8,6 +8,7 @@ export interface CliConfig {
   connectedDeviceId: string | null;
   enableAudio: boolean;
   isCiMode: boolean;
+  autoLaunchMoonlight: boolean;
 }
 
 export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig | null> {
@@ -15,6 +16,7 @@ export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig |
   let useUsbTethering = false;
   let connectedDeviceId: string | null = null;
   let enableAudio = false;
+  let autoLaunchMoonlight = false;
 
   if (isCiMode) {
     console.log(cyan('🤖 --ci mode active.'));
@@ -29,6 +31,12 @@ export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig |
       );
       useUsbTethering = true;
       connectedDeviceId = adbDeviceId;
+
+      // Check if Moonlight is present to auto-launch in CI
+      if (await isMoonlightInstalled(adbDeviceId)) {
+        console.log(cyan('📱 Moonlight detected on tablet. Will open automatically.'));
+        autoLaunchMoonlight = true;
+      }
     }
 
     if (useUsbTethering) {
@@ -51,7 +59,20 @@ export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig |
         initial: true
       });
       useUsbTethering = tetherResponse.useUsbTethering;
-      if (useUsbTethering) connectedDeviceId = adbDeviceId;
+      if (useUsbTethering) {
+        connectedDeviceId = adbDeviceId;
+
+        // 1.7. Moonlight Auto-Launch Prompt
+        if (await isMoonlightInstalled(adbDeviceId)) {
+          const launchResponse = await prompts({
+            type: 'confirm',
+            name: 'autoLaunchMoonlight',
+            message: '📱 Moonlight detected on tablet. Open it automatically?',
+            initial: true
+          });
+          autoLaunchMoonlight = !!launchResponse.autoLaunchMoonlight;
+        }
+      }
     } else if (adbDeviceId && !gnirehtetReady) {
       console.log(yellow('🔌 Android device detected, but Gnirehtet is not installed.'));
       console.log(
@@ -103,5 +124,5 @@ export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig |
     enableAudio = audioResponse.enableAudio;
   }
 
-  return { q, useUsbTethering, connectedDeviceId, enableAudio, isCiMode };
+  return { q, useUsbTethering, connectedDeviceId, enableAudio, isCiMode, autoLaunchMoonlight };
 }

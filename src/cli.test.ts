@@ -11,7 +11,8 @@ vi.mock('prompts', () => ({
 // Mock utils
 vi.mock('./utils.js', () => ({
   getAdbDeviceId: vi.fn(),
-  hasGnirehtet: vi.fn()
+  hasGnirehtet: vi.fn(),
+  isMoonlightInstalled: vi.fn()
 }));
 
 describe('CLI Interface (src/cli.ts)', () => {
@@ -33,9 +34,10 @@ describe('CLI Interface (src/cli.ts)', () => {
       });
     });
 
-    it('should automatically select Cinematic profile when USB device is detected', async () => {
+    it('should automatically select Cinematic profile and enable Moonlight launch when USB device is detected', async () => {
       vi.mocked(utils.getAdbDeviceId).mockResolvedValue('DEVICE123');
       vi.mocked(utils.hasGnirehtet).mockResolvedValue(true);
+      vi.mocked(utils.isMoonlightInstalled).mockResolvedValue(true);
 
       const config = await runInteractiveMenu(true);
 
@@ -43,6 +45,7 @@ describe('CLI Interface (src/cli.ts)', () => {
         isCiMode: true,
         useUsbTethering: true,
         connectedDeviceId: 'DEVICE123',
+        autoLaunchMoonlight: true,
         q: { maxBit: 60000 }
       });
     });
@@ -68,13 +71,15 @@ describe('CLI Interface (src/cli.ts)', () => {
       });
     });
 
-    it('should prompt for USB tethering if device is detected', async () => {
+    it('should prompt for USB tethering and Moonlight launch if device is detected', async () => {
       vi.mocked(utils.getAdbDeviceId).mockResolvedValue('DEVICE123');
       vi.mocked(utils.hasGnirehtet).mockResolvedValue(true);
+      vi.mocked(utils.isMoonlightInstalled).mockResolvedValue(true);
 
-      // Simulate user accepting USB tethering, selecting quality, and disabling audio
+      // Simulate user accepting USB tethering, accepting Moonlight launch, selecting quality, and disabling audio
       vi.mocked(prompts)
         .mockResolvedValueOnce({ useUsbTethering: true })
+        .mockResolvedValueOnce({ autoLaunchMoonlight: true })
         .mockResolvedValueOnce({ quality: { maxBit: 15000, sw: 'fast' } })
         .mockResolvedValueOnce({ enableAudio: false });
 
@@ -83,6 +88,7 @@ describe('CLI Interface (src/cli.ts)', () => {
       expect(config).toMatchObject({
         useUsbTethering: true,
         connectedDeviceId: 'DEVICE123',
+        autoLaunchMoonlight: true,
         q: { maxBit: 15000 }
       });
     });

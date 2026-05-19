@@ -36,4 +36,5 @@ sunshine-vd --ci
 - **Optional (Turbo USB)**: `brew install android-platform-tools gnirehtet`
 
 ---
-*Distributed under the GPL-3.0 license.*
+
+_Distributed under the GPL-3.0 license._

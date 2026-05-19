@@ -9,6 +9,11 @@ const execPromise = promisify(exec);
  * Ideal for supporting installations via Homebrew, native package (.app), or manual build.
  */
 export async function findSunshineBin(): Promise<string> {
+  // Support custom binary path via environment variable
+  if (process.env.SUNSHINE_BIN_PATH) {
+    return process.env.SUNSHINE_BIN_PATH;
+  }
+
   try {
     const { stdout } = await execPromise('which sunshine');
     const binPath = stdout.trim();

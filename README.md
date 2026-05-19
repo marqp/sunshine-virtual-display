@@ -46,7 +46,7 @@ This tool features a built-in **Turbo USB Mode** designed for scenarios where lo
 
 ### Using Standalone Binaries (Recommended)
 
-Download the latest version from the [Releases](https://github.com/your-username/sunshine-vd/releases) page and run:
+Download the latest version from the [Releases](https://github.com/marqp/sunshine-vd/releases) page and run:
 
 ```bash
 chmod +x sunshine-virtual-display-arm64
@@ -80,15 +80,6 @@ npm run lint   # Checks code quality with ESLint
 npm run test   # Runs unit tests with Vitest
 npm run build  # Bundles the code for distribution
 ```
-
-## 🛠️ Architecture and Engineering
-
-To ensure stability and a professional DX:
-
-- **Separation of Concerns (SoC)**: Modular architecture with dedicated managers for I/O, Processes, and CLI logic.
-- **Atomic Write**: Configuration files are handled with fault tolerance using a `.tmp` + `renameSync` strategy.
-- **Single-Binary Multi-process**: The compiled binary can spawn itself in a specialized daemon mode using `child_process.fork`, eliminating external script dependencies.
-- **CI/CD**: Fully automated pipeline via GitHub Actions that validates every PR and generates native releases for macOS x64/arm64.
 
 ## 🤝 Contributing
 

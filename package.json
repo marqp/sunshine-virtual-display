@@ -44,7 +44,7 @@
     "@types/prompts": "^2.4.9",
     "@vitest/coverage-v8": "^4.1.6",
     "@yao-pkg/pkg": "^6.19.0",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.0",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.6.0",

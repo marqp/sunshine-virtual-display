@@ -16,8 +16,8 @@ This tool is a specialized wrapper that bridges macOS native capabilities with t
 
 1.  **Native Display Creation**: It uses a background daemon to talk to macOS APIs and create a "ghost" virtual monitor. No HDMI dummy plugs needed.
 2.  **Auto-Provisioning**: It automatically finds your Sunshine config and overwrites it to target the new virtual screen with optimized bitrate presets.
-3.  **Turbo USB Mode**: If it detects an Android device via cable, it automatically sets up a high-speed network tunnel (via Gnirehtet) and bumps the quality to **Cinematic** (60Mbps).
-4.  **Clean Teardown**: When you close the app (Ctrl+C), it's programmed to clean up after itself—destroying the virtual monitor and stopping the streams—so you don't end up with zombie displays.
+3.  **Turbo USB Mode**: If it detects an Android device via cable, it automatically sets up a high-speed network tunnel (via Gnirehtet) and bumps the quality to **Cinematic** (60Mbps) and automatically launches Moonlight from your device. That's useful, especially under limited wi-fi signals or restrictive network firewalls.
+4.  **Clean Teardown**: When you close the app (Ctrl+C or unplug the device from USB), it's programmed to clean up after itself—destroying the virtual monitor and stopping the streams—so you don't end up with zombie displays.
 
 ## 📖 Usage
 
@@ -33,7 +33,7 @@ sunshine-vd --ci
 
 - **macOS** (Intel or Apple Silicon)
 - **Sunshine** installed (`brew install sunshine`)
-- **Optional (Turbo USB)**: `brew install android-platform-tools gnirehtet`
+- **Optional (Turbo USB)**: ADB and gnirehtet (`brew install android-platform-tools gnirehtet`)
 
 ---
 

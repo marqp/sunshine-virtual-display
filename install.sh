@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # ==============================================================================
 # Sunshine Virtual Display (macOS) - Universal Installer
@@ -51,6 +52,11 @@ RELEASE_DATA=$(curl -sSL "$RELEASE_API")
 
 if [ -z "$RELEASE_DATA" ]; then
     error "Could not connect to GitHub API. Please check your internet connection."
+fi
+
+# Validate that the response is a valid release (not an API error page)
+if ! echo "$RELEASE_DATA" | grep -q '"tag_name"'; then
+    error "GitHub API returned an unexpected response. The repository may not have any releases yet."
 fi
 
 # 3. Parse Download URL for the detected architecture

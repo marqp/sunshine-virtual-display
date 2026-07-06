@@ -6,12 +6,12 @@ import {
   isMoonlightInstalled,
   launchMoonlight
 } from './utils.js';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { access } from 'fs/promises';
 
 // Mock child_process
 vi.mock('child_process', () => ({
-  exec: vi.fn()
+  execFile: vi.fn()
 }));
 
 // Mock fs/promises
@@ -32,15 +32,16 @@ describe('System Utilities (src/utils.ts)', () => {
   describe('findSunshineBin', () => {
     it('should return SUNSHINE_BIN_PATH if environment variable is set', async () => {
       process.env.SUNSHINE_BIN_PATH = '/custom/path/sunshine';
+      vi.mocked(access).mockResolvedValueOnce(undefined);
       const bin = await findSunshineBin();
       expect(bin).toBe('/custom/path/sunshine');
 
       // Ensure it doesn't try to call 'which' if env var is set
-      expect(exec).not.toHaveBeenCalled();
+      expect(execFile).not.toHaveBeenCalled();
     });
 
     it('should return path from "which" if available', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(null, { stdout: '/usr/bin/sunshine' })) as any);
 
       const bin = await findSunshineBin();
@@ -48,7 +49,7 @@ describe('System Utilities (src/utils.ts)', () => {
     });
 
     it('should fall back to common paths if "which" fails', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(new Error('not found'))) as any);
 
       // Mock second path in commonPaths to succeed
@@ -60,18 +61,25 @@ describe('System Utilities (src/utils.ts)', () => {
     });
 
     it('should throw error if no binary is found anywhere', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(new Error('not found'))) as any);
       vi.mocked(access).mockRejectedValue(new Error('no'));
 
       await expect(findSunshineBin()).rejects.toThrow('Sunshine not found');
+    });
+
+    it('should throw if SUNSHINE_BIN_PATH points to a non-existent file', async () => {
+      process.env.SUNSHINE_BIN_PATH = '/nonexistent/path/sunshine';
+      vi.mocked(access).mockRejectedValueOnce(new Error('ENOENT'));
+
+      await expect(findSunshineBin()).rejects.toThrow('SUNSHINE_BIN_PATH is set');
     });
   });
 
   describe('getAdbDeviceId', () => {
     it('should return device ID when an authorized device is connected', async () => {
       const mockOutput = 'List of devices attached\nABC123\tdevice\n';
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(null, { stdout: mockOutput })) as any);
 
       const deviceId = await getAdbDeviceId();
@@ -80,7 +88,7 @@ describe('System Utilities (src/utils.ts)', () => {
 
     it('should return null when no device is connected', async () => {
       const mockOutput = 'List of devices attached\n';
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(null, { stdout: mockOutput })) as any);
 
       const deviceId = await getAdbDeviceId();
@@ -88,7 +96,7 @@ describe('System Utilities (src/utils.ts)', () => {
     });
 
     it('should return null if adb command fails', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(new Error('ADB not found'))) as any);
 
       const deviceId = await getAdbDeviceId();
@@ -98,7 +106,7 @@ describe('System Utilities (src/utils.ts)', () => {
 
   describe('hasGnirehtet', () => {
     it('should return true if gnirehtet is installed', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(null, { stdout: '/usr/local/bin/gnirehtet' })) as any);
 
       const result = await hasGnirehtet();
@@ -106,7 +114,7 @@ describe('System Utilities (src/utils.ts)', () => {
     });
 
     it('should return false if gnirehtet is missing', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(new Error('command not found'))) as any);
 
       const result = await hasGnirehtet();
@@ -116,19 +124,20 @@ describe('System Utilities (src/utils.ts)', () => {
 
   describe('isMoonlightInstalled', () => {
     it('should return true if Moonlight is found', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(null, { stdout: 'package:com.limelight' })) as any);
 
       const result = await isMoonlightInstalled('SERIAL123');
       expect(result).toBe(true);
-      expect(exec).toHaveBeenCalledWith(
-        expect.stringContaining('shell pm list packages com.limelight'),
+      expect(execFile).toHaveBeenCalledWith(
+        'adb',
+        ['-s', 'SERIAL123', 'shell', 'pm', 'list', 'packages', 'com.limelight'],
         expect.any(Function)
       );
     });
 
     it('should return false if Moonlight is not found', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(null, { stdout: '' })) as any);
 
       const result = await isMoonlightInstalled('SERIAL123');
@@ -138,12 +147,13 @@ describe('System Utilities (src/utils.ts)', () => {
 
   describe('launchMoonlight', () => {
     it('should call monkey launch command', async () => {
-      vi.mocked(exec).mockImplementation(((cmd: string, cb: any) =>
+      vi.mocked(execFile).mockImplementation(((file: string, args: string[], cb: any) =>
         cb(null, { stdout: 'OK' })) as any);
 
       await launchMoonlight('SERIAL123');
-      expect(exec).toHaveBeenCalledWith(
-        expect.stringContaining('shell monkey -p com.limelight'),
+      expect(execFile).toHaveBeenCalledWith(
+        'adb',
+        ['-s', 'SERIAL123', 'shell', 'monkey', '-p', 'com.limelight', '-c', 'android.intent.category.LAUNCHER', '1'],
         expect.any(Function)
       );
     });

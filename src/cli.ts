@@ -3,7 +3,7 @@ import { cyan, green, yellow } from 'kleur/colors';
 import { getAdbDeviceId, hasGnirehtet, isMoonlightInstalled } from './utils.js';
 
 export interface CliConfig {
-  q: { minBit: number; maxBit: number; sw: string };
+  q: { minBit: number; maxBit: number };
   useUsbTethering: boolean;
   connectedDeviceId: string | null;
   enableAudio: boolean;
@@ -41,10 +41,10 @@ export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig |
 
     if (useUsbTethering) {
       console.log(cyan('✨ Turbo USB detected: Automatically selecting Cinematic profile...'));
-      q = { minBit: 30000, maxBit: 60000, sw: 'medium' };
+      q = { minBit: 30000, maxBit: 60000 };
     } else {
       console.log(cyan('⚖️  Standard network: Automatically selecting Balanced profile...'));
-      q = { minBit: 15000, maxBit: 30000, sw: 'fast' };
+      q = { minBit: 15000, maxBit: 30000 };
     }
   } else {
     // 1.5. USB Tethering Check
@@ -88,15 +88,15 @@ export async function runInteractiveMenu(isCiMode: boolean): Promise<CliConfig |
       choices: [
         {
           title: '🎮 Competitive (Ultra Low Latency)',
-          value: { minBit: 5000, maxBit: 15000, sw: 'fast' }
+          value: { minBit: 5000, maxBit: 15000 }
         },
         {
           title: '⚖️  Balanced (Smoothness & Clarity)',
-          value: { minBit: 15000, maxBit: 30000, sw: 'fast' }
+          value: { minBit: 15000, maxBit: 30000 }
         },
         {
           title: '🍿 Cinematic (Maximum Quality)',
-          value: { minBit: 30000, maxBit: 60000, sw: 'medium' }
+          value: { minBit: 30000, maxBit: 60000 }
         }
       ],
       initial: 1

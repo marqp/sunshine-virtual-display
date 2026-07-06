@@ -148,7 +148,7 @@ async function main() {
 
   console.log(cyan('⚙️  Optimizing Sunshine via ScreenCaptureKit...'));
 
-  const sunshineConfig = generateSunshineConfig(displayId, q.maxBit, q.sw, enableAudio);
+  const sunshineConfig = generateSunshineConfig(displayId, q.maxBit, enableAudio, useUsbTethering);
 
   try {
     writeSunshineConfigAtomic(sunshineConfig, SUNSHINE_CONF);
@@ -163,7 +163,7 @@ async function main() {
   try {
     if (os.platform() === 'darwin') {
       execSync('killall sunshine 2>/dev/null || true');
-      execSync('sleep 1');
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   } catch {
     /* Ignore errors */
@@ -194,11 +194,20 @@ async function main() {
     console.log(cyan(' ℹ️  USB TUNNEL ACTIVE: Connect Moonlight to IP 10.0.2.2'));
     console.log(cyan('======================================================\n'));
 
+    let isCheckingUsb = false;
     const unplugInterval = setInterval(async () => {
-      const currentId = await getAdbDeviceId();
-      if (!currentId || currentId !== connectedDeviceId) {
-        console.log(red('\n🔌 USB cable disconnected. Closing session...'));
-        pm.teardown();
+      if (isCheckingUsb) return;
+      isCheckingUsb = true;
+      try {
+        const currentId = await getAdbDeviceId();
+        if (!currentId || currentId !== connectedDeviceId) {
+          console.log(red('\n🔌 USB cable disconnected. Closing session...'));
+          pm.teardown();
+        }
+      } catch {
+        /* Ignore USB polling errors */
+      } finally {
+        isCheckingUsb = false;
       }
     }, 3000);
     pm.setUsbMonitor(unplugInterval);

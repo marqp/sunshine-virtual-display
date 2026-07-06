@@ -1,8 +1,8 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { access } from 'fs/promises';
 
-const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 
 /**
  * Dynamically looks for the Sunshine executable in the system.
@@ -11,11 +11,16 @@ const execPromise = promisify(exec);
 export async function findSunshineBin(): Promise<string> {
   // Support custom binary path via environment variable
   if (process.env.SUNSHINE_BIN_PATH) {
-    return process.env.SUNSHINE_BIN_PATH;
+    try {
+      await access(process.env.SUNSHINE_BIN_PATH);
+      return process.env.SUNSHINE_BIN_PATH;
+    } catch {
+      throw new Error(`SUNSHINE_BIN_PATH is set to "${process.env.SUNSHINE_BIN_PATH}" but the file does not exist or is not accessible.`);
+    }
   }
 
   try {
-    const { stdout } = await execPromise('which sunshine');
+    const { stdout } = await execFilePromise('which', ['sunshine']);
     const binPath = stdout.trim();
     if (binPath) return binPath;
   } catch {
@@ -47,7 +52,7 @@ export async function findSunshineBin(): Promise<string> {
  */
 export async function getAdbDeviceId(): Promise<string | null> {
   try {
-    const { stdout } = await execPromise('adb devices');
+    const { stdout } = await execFilePromise('adb', ['devices']);
     const lines = stdout.trim().split('\n');
     // Look for the first line that contains an active and authorized device
     const deviceLine = lines.find((line) => line.includes('\tdevice'));
@@ -65,7 +70,7 @@ export async function getAdbDeviceId(): Promise<string | null> {
  */
 export async function hasGnirehtet(): Promise<boolean> {
   try {
-    await execPromise('which gnirehtet');
+    await execFilePromise('which', ['gnirehtet']);
     return true;
   } catch {
     return false;
@@ -77,7 +82,7 @@ export async function hasGnirehtet(): Promise<boolean> {
  */
 export async function isMoonlightInstalled(deviceId: string): Promise<boolean> {
   try {
-    const { stdout } = await execPromise(`adb -s ${deviceId} shell pm list packages com.limelight`);
+    const { stdout } = await execFilePromise('adb', ['-s', deviceId, 'shell', 'pm', 'list', 'packages', 'com.limelight']);
     return stdout.includes('package:com.limelight');
   } catch {
     return false;
@@ -89,9 +94,12 @@ export async function isMoonlightInstalled(deviceId: string): Promise<boolean> {
  */
 export async function launchMoonlight(deviceId: string): Promise<void> {
   try {
-    await execPromise(
-      `adb -s ${deviceId} shell monkey -p com.limelight -c android.intent.category.LAUNCHER 1`
-    );
+    await execFilePromise('adb', [
+      '-s', deviceId, 'shell', 'monkey',
+      '-p', 'com.limelight',
+      '-c', 'android.intent.category.LAUNCHER',
+      '1'
+    ]);
   } catch {
     /* Ignore failures to launch */
   }

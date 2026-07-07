@@ -176,7 +176,6 @@ async function main() {
 
   if (useUsbTethering) {
     console.log(cyan('🔌 Starting USB tunnel (Gnirehtet)...'));
-    let activeGnirehtet: any = null;
     const startGnirehtet = (isRestart = false) => {
       if (isRestart) {
         console.log(yellow('🔄 Restarting USB tunnel (Gnirehtet)...'));
@@ -185,7 +184,6 @@ async function main() {
       const gnirehtetProcess = spawn('gnirehtet', ['run'], {
         stdio: ['ignore', 'pipe', 'pipe']
       });
-      activeGnirehtet = gnirehtetProcess;
       pm.registerGnirehtet(gnirehtetProcess);
 
       if (gnirehtetProcess.stderr) {

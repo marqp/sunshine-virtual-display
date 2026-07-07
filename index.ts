@@ -220,28 +220,6 @@ async function main() {
         if (!currentId || currentId !== connectedDeviceId) {
           console.log(red('\n🔌 USB cable disconnected. Closing session...'));
           pm.teardown();
-        } else {
-          try {
-            const { execFile } = await import('child_process');
-            const { promisify } = await import('util');
-            const execFileAsync = promisify(execFile);
-            
-            // Active TCP Health Check
-            // We use 'nc' (netcat) on Android to ping Sunshine's port via the tunnel.
-            try {
-              await execFileAsync('adb', ['-s', connectedDeviceId, 'shell', 'nc', '-z', '-w', '2', '10.0.2.2', '47989']);
-            } catch (ncErr: any) {
-              const errMsg = (ncErr.stdout || '') + (ncErr.stderr || '') + (ncErr.message || '');
-              if (errMsg.toLowerCase().includes('timeout') || errMsg.toLowerCase().includes('connection refused')) {
-                if (activeGnirehtet && !activeGnirehtet.killed) {
-                  console.log(yellow('\n🧟 Gnirehtet proxy zombie detected (TCP timeout). Killing to force restart...'));
-                  activeGnirehtet.kill('SIGKILL');
-                }
-              }
-            }
-          } catch {
-            /* Ignore ADB errors */
-          }
         }
       } catch {
         /* Ignore USB polling errors */

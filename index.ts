@@ -226,10 +226,7 @@ async function main() {
             const { promisify } = await import('util');
             const execFileAsync = promisify(execFile);
             
-            // 1. Proactively heal the ADB reverse tunnel in case of micro-disconnections
-            await execFileAsync('gnirehtet', ['tunnel', connectedDeviceId]);
-            
-            // 2. Active TCP Health Check
+            // Active TCP Health Check
             // We use 'nc' (netcat) on Android to ping Sunshine's port via the tunnel.
             try {
               await execFileAsync('adb', ['-s', connectedDeviceId, 'shell', 'nc', '-z', '-w', '2', '10.0.2.2', '47989']);
@@ -243,7 +240,7 @@ async function main() {
               }
             }
           } catch {
-            /* Ignore healing/ADB errors */
+            /* Ignore ADB errors */
           }
         }
       } catch {

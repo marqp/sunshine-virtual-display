@@ -176,19 +176,36 @@ async function main() {
 
   if (useUsbTethering) {
     console.log(cyan('🔌 Starting USB tunnel (Gnirehtet)...'));
-    const gnirehtetProcess = spawn('gnirehtet', ['run'], {
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    pm.registerGnirehtet(gnirehtetProcess);
+    let activeGnirehtet: any = null;
+    const startGnirehtet = (isRestart = false) => {
+      if (isRestart) {
+        console.log(yellow('🔄 Restarting USB tunnel (Gnirehtet)...'));
+      }
 
-    if (gnirehtetProcess.stderr) {
-      gnirehtetProcess.stderr.on('data', (data) => {
-        const msg = data.toString();
-        if (msg.includes('Exception') || msg.includes('Error') || msg.includes('fail')) {
-          console.error(red(`[Gnirehtet] ${msg.trim()}`));
+      const gnirehtetProcess = spawn('gnirehtet', ['run'], {
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+      activeGnirehtet = gnirehtetProcess;
+      pm.registerGnirehtet(gnirehtetProcess);
+
+      if (gnirehtetProcess.stderr) {
+        gnirehtetProcess.stderr.on('data', (data) => {
+          const msg = data.toString();
+          if (msg.includes('Exception') || msg.includes('Error') || msg.includes('fail')) {
+            console.error(red(`[Gnirehtet] ${msg.trim()}`));
+          }
+        });
+      }
+
+      gnirehtetProcess.on('exit', (code) => {
+        if (!pm.isShuttingDown) {
+          console.log(yellow(`\n⚠️  USB tunnel closed unexpectedly (code ${code}). Restarting in 2s...`));
+          setTimeout(() => startGnirehtet(true), 2000);
         }
       });
-    }
+    };
+
+    startGnirehtet();
 
     console.log(cyan('\n======================================================'));
     console.log(cyan(' ℹ️  USB TUNNEL ACTIVE: Connect Moonlight to IP 10.0.2.2'));
@@ -203,6 +220,31 @@ async function main() {
         if (!currentId || currentId !== connectedDeviceId) {
           console.log(red('\n🔌 USB cable disconnected. Closing session...'));
           pm.teardown();
+        } else {
+          try {
+            const { execFile } = await import('child_process');
+            const { promisify } = await import('util');
+            const execFileAsync = promisify(execFile);
+            
+            // 1. Proactively heal the ADB reverse tunnel in case of micro-disconnections
+            await execFileAsync('gnirehtet', ['tunnel', connectedDeviceId]);
+            
+            // 2. Active TCP Health Check
+            // We use 'nc' (netcat) on Android to ping Sunshine's port via the tunnel.
+            try {
+              await execFileAsync('adb', ['-s', connectedDeviceId, 'shell', 'nc', '-z', '-w', '2', '10.0.2.2', '47989']);
+            } catch (ncErr: any) {
+              const errMsg = (ncErr.stdout || '') + (ncErr.stderr || '') + (ncErr.message || '');
+              if (errMsg.toLowerCase().includes('timeout') || errMsg.toLowerCase().includes('connection refused')) {
+                if (activeGnirehtet && !activeGnirehtet.killed) {
+                  console.log(yellow('\n🧟 Gnirehtet proxy zombie detected (TCP timeout). Killing to force restart...'));
+                  activeGnirehtet.kill('SIGKILL');
+                }
+              }
+            }
+          } catch {
+            /* Ignore healing/ADB errors */
+          }
         }
       } catch {
         /* Ignore USB polling errors */

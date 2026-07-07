@@ -11,7 +11,7 @@ export class ProcessManager {
   private sunshineProcess: ChildProcess | null = null;
   private gnirehtetProcess: ChildProcess | null = null;
   private usbMonitorInterval: NodeJS.Timeout | null = null;
-  private isShuttingDown = false;
+  public isShuttingDown = false;
 
   constructor() {
     // Self-register lifecycle listeners

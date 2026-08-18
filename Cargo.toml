@@ -1,0 +1,27 @@
+[package]
+name = "sunshine-virtual-display"
+version = "2.0.0"
+edition = "2021"
+authors = ["Pietro Marques"]
+license = "GPL-3.0-only"
+description = "A native macOS CLI tool to create virtual displays, auto-provision Sunshine, and manage USB reverse tethering."
+
+[[bin]]
+name = "sunshine-vd"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+inquire = "0.7"
+colored = "2.1"
+tokio = { version = "1.38", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+futures = "0.3"
+which = "6.0"
+tempfile = "3.10"
+regex = "1.10"
+anyhow = "1.0"
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"

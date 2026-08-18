@@ -3,31 +3,25 @@
 Guidelines and architecture reference for AI agents working in this repository.
 
 ## Overview
-
-`sunshine-virtual-display` is a macOS CLI tool built with **Bun** and **TypeScript** that creates native macOS virtual displays, provisions Sunshine, and manages USB reverse tethering to Android clients via Gnirehtet.
+`sunshine-virtual-display` is an ultra-lightweight macOS CLI tool built in **Rust** that creates native macOS virtual displays, provisions Sunshine, and manages USB reverse tethering to Android clients via Gnirehtet.
 
 ## Architecture
-
-- **Runtime & Toolchain**: Bun (TypeScript execution, Vitest runner, standalone compiler).
+- **Runtime & Toolchain**: Rust (Cargo, Tokio async runtime).
 - **Core Modules**:
-  - `src/virtual-display.ts`: TypeScript wrapper around native `virtual_display.node` (CoreGraphics / SkyLight SPIs).
-  - `src/daemon.ts`: Background daemon maintaining the virtual display handle via IPC.
-  - `src/sunshine.ts` & `src/io.ts`: Generates and atomically writes Sunshine configuration (`~/.config/sunshine/sunshine.conf`).
-  - `src/gnirehtet.ts`: Supervises Gnirehtet reverse tethering, handles non-blocking stream draining, route isolation (`-r 10.0.2.2/32`), and Android VPN cleanup.
-  - `src/process-manager.ts`: Centralized teardown and signal handling (`SIGINT`, `SIGTERM`, USB unplug).
-  - `src/cli.ts`: Interactive and CI automated prompt workflows.
-  - `index.ts`: Application entrypoint and orchestrator.
+  - `src/display/`: Native macOS CoreGraphics / SkyLight SPIs via Objective-C runtime bridge (`native_virtual_display.m`) wrapped in safe RAII `VirtualDisplay` with automatic `Drop` cleanup.
+  - `src/sunshine/`: Generates and atomically writes Sunshine configuration (`~/.config/sunshine/sunshine.conf`).
+  - `src/gnirehtet/`: Supervises Gnirehtet reverse tethering, handles non-blocking asynchronous stream reading (`LinesCodec`), route isolation (`-r 10.0.2.2/32`), and Android VPN cleanup.
+  - `src/adb/`: Device polling watcher, battery whitelist, and Moonlight app launch triggers.
+  - `src/cli/`: Interactive prompts (`inquire`) and CLI argument parsing (`clap`).
+  - `src/main.rs`: Application entrypoint, signal handling, and cancellation coordination.
 
 ## Commands
-
-- **Dev**: `bun run dev` / `bun run dev --ci`
-- **Test**: `bun run test` (Vitest)
-- **Lint & Format**: `bun run lint` / `bun run format`
-- **Build standalone**: `bun run package` (compiles arm64 & x64 executables)
+- **Dev**: `cargo run` / `cargo run -- --ci`
+- **Test**: `cargo test`
+- **Build release**: `cargo build --release` (compiles optimized ~2.1 MB Mach-O binary)
 
 ## Rules & Conventions
-
-- Pure TypeScript everywhere.
+- Pure Rust codebase with zero runtime dependencies.
 - Always drain `stdout` and `stderr` streams when spawning child processes to prevent OS pipe deadlocks.
-- Register all spawned resources and timers in `ProcessManager` for cleanup on exit.
-- Keep tests updated (`src/*.test.ts`). All tests must pass before committing.
+- Ensure all resources rely on RAII or cancellation tokens for graceful teardown on exit.
+- Keep tests updated (`tests/` and unit test modules). All tests must pass before committing.

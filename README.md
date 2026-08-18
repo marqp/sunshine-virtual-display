@@ -1,10 +1,10 @@
 # Sunshine Virtual Display (macOS) ☀️
 
-CLI tool to create native macOS virtual displays and automatically provision Sunshine for headless streaming to Android tablets (via Wi-Fi or high-speed USB reverse tethering).
+Ultra-lightweight native macOS CLI tool built in **Rust** to create native virtual displays and automatically provision Sunshine for headless streaming to Android tablets (via Wi-Fi or high-speed USB reverse tethering).
 
 ## 🚀 Quick Install
 
-Install the latest standalone binary globally (no Bun/Node.js required):
+Install the latest standalone binary globally:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/marqp/sunshine-virtual-display/main/install.sh | bash
@@ -12,7 +12,7 @@ curl -sSL https://raw.githubusercontent.com/marqp/sunshine-virtual-display/main/
 
 ## 🛠️ How it Works
 
-1. **Native Display Creation**: Interfaces with macOS Quartz/CoreGraphics APIs to spawn a native virtual display without HDMI dummy plugs.
+1. **Native Display Creation**: Directly links to macOS Quartz/CoreGraphics APIs to spawn a native virtual display with RAII lifecycle cleanup.
 2. **Auto-Provisioning**: Generates and applies optimized Sunshine configuration (`~/.config/sunshine/sunshine.conf`) targeting the virtual monitor.
 3. **Turbo USB Mode**: Detects connected Android devices over USB, sets up a reverse network tunnel with route isolation via Gnirehtet, optimizes bitrate, and automatically launches Moonlight on the tablet.
 4. **Lifecycle & Clean Teardown**: Handles process signals (`SIGINT`/`SIGTERM`) and USB unplug events, destroying the virtual display and terminating all tunnels cleanly.
@@ -36,11 +36,10 @@ sunshine-vd --ci
 ## 💻 Development
 
 ```bash
-bun install
-bun run dev      # Run directly via Bun
-bun run test     # Run unit tests
-bun run lint     # Lint codebase
-bun run package  # Build standalone binaries (arm64 & x64)
+cargo run            # Run interactive CLI
+cargo run -- --ci    # Run in automated CI mode
+cargo test           # Run all unit and integration tests
+cargo build --release # Build optimized standalone binary (~2.1 MB)
 ```
 
 ---

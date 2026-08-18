@@ -8,68 +8,54 @@ on:
 
 jobs:
   # 1. Job de Integração Contínua (CI)
-  # Valida a qualidade do código e executa testes unitários com Bun.
+  # Executa testes unitários e de integração no runner macOS.
   ci:
-    name: Lint & Test
-    runs-on: ubuntu-latest
+    name: Test & Check (macOS)
+    runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Run Lint
-        run: bun run lint
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Run Tests
-        run: bun run test
+        run: cargo test --verbose
 
   # 2. Job de Entrega Contínua (CD)
-  # Compila os binários nativos para macOS diretamente via Bun e publica no GitHub Releases.
+  # Compila os binários nativos para arm64 e x86_64 e publica no GitHub Releases.
   # Só executa em pushes na branch main após o CI passar.
   cd:
     name: Build & Release (macOS)
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: macos-latest # Runner obrigatório para compilar módulos nativos do macOS
+    runs-on: macos-latest
     permissions:
       contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Generate Version Tag
         shell: bash
-        # Gera a versão dinamicamente no formato: vYYYYMMDD-HHMMSS (Ex: v20260518-234512)
-        # O fuso horário padrão do GitHub Actions é UTC.
         run: |
           VERSION_TAG="v$(date +'%Y%m%d-%H%M%S')"
           echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
 
-      - name: Generate Binaries (Bun Compile)
-        # Gera executáveis estáticos para x64 e arm64
-        run: bun run package
-
-      - name: Prepare Assets
-        shell: bash
-        # Renomeia os binários para seguir rigorosamente o padrão solicitado
+      - name: Build Binaries (arm64 & x64)
         run: |
-          mv bin/sunshine-virtual-display-x64 bin/sunshine-vd-macos-x64-${{ env.VERSION_TAG }}
-          mv bin/sunshine-virtual-display-arm64 bin/sunshine-vd-macos-arm64-${{ env.VERSION_TAG }}
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          mkdir -p bin
+          cp target/aarch64-apple-darwin/release/sunshine-vd bin/sunshine-vd-macos-arm64-${{ env.VERSION_TAG }}
+          cp target/x86_64-apple-darwin/release/sunshine-vd bin/sunshine-vd-macos-x64-${{ env.VERSION_TAG }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -78,7 +64,6 @@ jobs:
           name: Release ${{ env.VERSION_TAG }}
           draft: false
           prerelease: false
-          # Inclui os binários renomeados na release
           files: |
             bin/sunshine-vd-macos-x64-${{ env.VERSION_TAG }}
             bin/sunshine-vd-macos-arm64-${{ env.VERSION_TAG }}

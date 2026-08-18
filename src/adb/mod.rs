@@ -53,7 +53,6 @@ pub async fn get_adb_device_id() -> Option<String> {
     None
 }
 
-#[allow(dead_code)]
 pub fn parse_wm_size_output(stdout: &str) -> Option<(u32, u32)> {
     // Searches for "Override size:" first, then falls back to "Physical size:"
     let mut chosen_size = None;
@@ -82,7 +81,6 @@ pub fn parse_wm_size_output(stdout: &str) -> Option<(u32, u32)> {
     None
 }
 
-#[allow(dead_code)]
 pub async fn get_device_screen_size(device_id: Option<&str>) -> Option<(u32, u32)> {
     let mut cmd = Command::new("adb");
     if let Some(id) = device_id {

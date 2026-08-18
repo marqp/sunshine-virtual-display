@@ -2,7 +2,9 @@ use clap::Parser;
 use colored::Colorize;
 use inquire::{Confirm, Select};
 
-use crate::adb::{get_adb_device_id, has_gnirehtet, is_moonlight_installed};
+use crate::adb::{
+    get_adb_device_id, get_device_screen_size, has_gnirehtet, is_moonlight_installed,
+};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -16,12 +18,12 @@ pub struct CliArgs {
     pub ci: bool,
 
     /// Custom width for the virtual display
-    #[arg(long, default_value_t = 1920)]
-    pub width: u32,
+    #[arg(long)]
+    pub width: Option<u32>,
 
     /// Custom height for the virtual display
-    #[arg(long, default_value_t = 1080)]
-    pub height: u32,
+    #[arg(long)]
+    pub height: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -63,12 +65,58 @@ pub struct RunConfig {
 
 pub async fn run_menu(args: &CliArgs) -> Option<RunConfig> {
     let adb_device_id = get_adb_device_id().await;
+    let detected_screen = get_device_screen_size(adb_device_id.as_deref()).await;
     let gnirehtet_ready = has_gnirehtet().await;
 
     let mut use_usb_tethering = false;
     let mut auto_launch_moonlight = false;
     let max_bitrate: u32;
     let enable_audio: bool;
+
+    // Automatic resolution detection based on ADB physical screen aspect ratio
+    let (selected_width, selected_height) = match (args.width, args.height) {
+        (Some(w), Some(h)) => (w, h),
+        (Some(w), None) => (w, 1080),
+        (None, Some(h)) => (1920, h),
+        (None, None) => {
+            if let Some((w, h)) = detected_screen {
+                let aspect = w as f64 / h as f64;
+                if (aspect - 1.6).abs() < 0.05 {
+                    println!(
+                        "{}",
+                        format!(
+                            "📱 Detected 16:10 tablet display ({}x{}). Automatically setting 1920x1200 resolution.",
+                            w, h
+                        )
+                        .green()
+                    );
+                    (1920, 1200)
+                } else if (aspect - 16.0 / 9.0).abs() < 0.05 {
+                    println!(
+                        "{}",
+                        format!(
+                            "📱 Detected 16:9 display ({}x{}). Automatically setting 1920x1080 resolution.",
+                            w, h
+                        )
+                        .green()
+                    );
+                    (1920, 1080)
+                } else {
+                    println!(
+                        "{}",
+                        format!(
+                            "📱 Detected display ({}x{}). Defaulting to 1920x1080 resolution.",
+                            w, h
+                        )
+                        .cyan()
+                    );
+                    (1920, 1080)
+                }
+            } else {
+                (1920, 1080)
+            }
+        }
+    };
 
     if args.ci {
         println!("{}", "🤖 --ci mode active.".cyan());
@@ -163,7 +211,7 @@ pub async fn run_menu(args: &CliArgs) -> Option<RunConfig> {
         connected_device_id: adb_device_id,
         enable_audio,
         auto_launch_moonlight,
-        width: args.width,
-        height: args.height,
+        width: selected_width,
+        height: selected_height,
     })
 }

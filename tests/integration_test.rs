@@ -16,8 +16,11 @@ mod tests {
         let mut lines = vec![
             format!("output_name = {}", display_id),
             format!("max_bitrate = {}", max_bitrate),
-            "sw_preset = fast".to_string(),
-            "sw_tune = zerolatency".to_string(),
+            "encoder = videotoolbox".to_string(),
+            "vt_software = disabled".to_string(),
+            "vt_coder = cabac".to_string(),
+            "hevc_mode = 2".to_string(),
+            "fps = [60]".to_string(),
             "min_log_level = info".to_string(),
         ];
         if use_usb_tethering {
@@ -34,6 +37,13 @@ mod tests {
         let read_back = fs::read_to_string(&target_path).unwrap();
         assert!(read_back.contains("output_name = 42"));
         assert!(read_back.contains("max_bitrate = 60000"));
+        assert!(read_back.contains("encoder = videotoolbox"));
+        assert!(read_back.contains("vt_software = disabled"));
+        assert!(read_back.contains("vt_coder = cabac"));
+        assert!(read_back.contains("hevc_mode = 2"));
+        assert!(read_back.contains("fps = [60]"));
+        assert!(!read_back.contains("sw_preset"));
+        assert!(!read_back.contains("sw_tune"));
         assert!(read_back.contains("fec_percentage = 0"));
     }
 }

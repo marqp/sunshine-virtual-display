@@ -2,9 +2,7 @@ use clap::Parser;
 use colored::Colorize;
 use inquire::{Confirm, Select};
 
-use crate::adb::{
-    get_adb_device_id, get_device_screen_size, has_gnirehtet, is_moonlight_installed,
-};
+use crate::adb::{get_adb_device_id, has_gnirehtet, is_moonlight_installed};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -18,12 +16,12 @@ pub struct CliArgs {
     pub ci: bool,
 
     /// Custom width for the virtual display
-    #[arg(long)]
-    pub width: Option<u32>,
+    #[arg(long, default_value_t = 1920)]
+    pub width: u32,
 
     /// Custom height for the virtual display
-    #[arg(long)]
-    pub height: Option<u32>,
+    #[arg(long, default_value_t = 1080)]
+    pub height: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,7 +63,6 @@ pub struct RunConfig {
 
 pub async fn run_menu(args: &CliArgs) -> Option<RunConfig> {
     let adb_device_id = get_adb_device_id().await;
-    let detected_screen = get_device_screen_size(adb_device_id.as_deref()).await;
     let gnirehtet_ready = has_gnirehtet().await;
 
     let mut use_usb_tethering = false;
@@ -73,33 +70,8 @@ pub async fn run_menu(args: &CliArgs) -> Option<RunConfig> {
     let max_bitrate: u32;
     let enable_audio: bool;
 
-    let mut selected_width = args.width.unwrap_or(1920);
-    let mut selected_height = args.height.unwrap_or(1080);
-
-    let is_16_10 = if let Some((w, h)) = detected_screen {
-        let aspect = w as f64 / h as f64;
-        (aspect - 1.6).abs() < 0.05
-    } else {
-        false
-    };
-
     if args.ci {
         println!("{}", "🤖 --ci mode active.".cyan());
-
-        if let Some((w, h)) = detected_screen {
-            if is_16_10 && args.width.is_none() && args.height.is_none() {
-                println!(
-                    "{}",
-                    format!(
-                        "📱 Detected 16:10 tablet display ({}x{}). Auto-applying 1920x1200 resolution (0% letterboxing).",
-                        w, h
-                    )
-                    .green()
-                );
-                selected_width = 1920;
-                selected_height = 1200;
-            }
-        }
 
         if let Some(ref dev_id) = adb_device_id {
             if gnirehtet_ready {
@@ -137,20 +109,6 @@ pub async fn run_menu(args: &CliArgs) -> Option<RunConfig> {
         }
         enable_audio = false;
     } else {
-        if let Some((w, h)) = detected_screen {
-            if is_16_10 && args.width.is_none() && args.height.is_none() {
-                let msg = format!(
-                    "📱 Detected 16:10 tablet screen ({}x{}). Use 1920x1200 to eliminate letterboxing?",
-                    w, h
-                );
-                let use_16_10 = Confirm::new(&msg).with_default(true).prompt().ok()?;
-                if use_16_10 {
-                    selected_width = 1920;
-                    selected_height = 1200;
-                }
-            }
-        }
-
         if let Some(ref dev_id) = adb_device_id {
             if gnirehtet_ready {
                 let tether_ans = Confirm::new(
@@ -205,7 +163,7 @@ pub async fn run_menu(args: &CliArgs) -> Option<RunConfig> {
         connected_device_id: adb_device_id,
         enable_audio,
         auto_launch_moonlight,
-        width: selected_width,
-        height: selected_height,
+        width: args.width,
+        height: args.height,
     })
 }

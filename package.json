@@ -8,11 +8,14 @@
   },
   "type": "module",
   "scripts": {
+    "dev": "bun run index.ts",
+    "start": "bun run index.ts",
     "test": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "build": "esbuild index.ts --bundle --platform=node --format=cjs --outfile=dist/bundle.cjs --external:node-mac-virtual-display",
-    "package": "pkg . --targets node22-macos-x64,node22-macos-arm64 --out-path bin"
+    "build": "bun build --compile --minify index.ts --outfile dist/sunshine-vd",
+    "package": "bun build --compile --minify --target=bun-darwin-arm64 index.ts --outfile bin/sunshine-virtual-display-arm64 && bun build --compile --minify --target=bun-darwin-x64 index.ts --outfile bin/sunshine-virtual-display-x64",
+    "package:node": "esbuild index.ts --bundle --platform=node --format=cjs --outfile=dist/bundle.cjs --external:node-mac-virtual-display && pkg . --targets node22-macos-x64,node22-macos-arm64 --out-path bin"
   },
   "pkg": {
     "assets": [
@@ -39,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/bun": "^1.3.14",
     "@types/node": "^25.8.0",
     "@types/ora": "^3.1.0",
     "@types/prompts": "^2.4.9",

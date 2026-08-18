@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runDaemon } from './daemon.js';
 
-// Mock node-mac-virtual-display with a proper constructor function
+// Mock virtual-display with a proper constructor function
 const mockCreateVirtualDisplay = vi.fn();
 const mockDestroyVirtualDisplay = vi.fn();
-vi.mock('node-mac-virtual-display', () => ({
+vi.mock('./virtual-display.js', () => ({
   default: function MockVirtualDisplay() {
     this.createVirtualDisplay = mockCreateVirtualDisplay;
     this.destroyVirtualDisplay = mockDestroyVirtualDisplay;

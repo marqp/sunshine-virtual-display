@@ -1,4 +1,4 @@
-import VirtualDisplay from 'node-mac-virtual-display';
+import VirtualDisplay from './virtual-display.js';
 
 /**
  * runDaemon encapsulates the logic for creating and managing the native macOS

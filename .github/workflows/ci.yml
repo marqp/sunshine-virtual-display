@@ -8,7 +8,7 @@ on:
 
 jobs:
   # 1. Job de Integração Contínua (CI)
-  # Valida a qualidade do código e executa testes unitários em ambiente Linux (mais rápido).
+  # Valida a qualidade do código e executa testes unitários com Bun.
   ci:
     name: Lint & Test
     runs-on: ubuntu-latest
@@ -16,23 +16,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: 'npm'
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Run Lint
-        run: npm run lint
+        run: bun run lint
 
       - name: Run Tests
-        run: npm run test
+        run: bun run test
 
   # 2. Job de Entrega Contínua (CD)
-  # Compila os binários nativos para macOS e publica no GitHub Releases.
+  # Compila os binários nativos para macOS diretamente via Bun e publica no GitHub Releases.
   # Só executa em pushes na branch main após o CI passar.
   cd:
     name: Build & Release (macOS)
@@ -45,14 +44,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22 # Usando Node 22 para compatibilidade com o target do pkg
-          cache: 'npm'
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Generate Version Tag
         shell: bash
@@ -62,13 +60,9 @@ jobs:
           VERSION_TAG="v$(date +'%Y%m%d-%H%M%S')"
           echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
 
-      - name: Build Bundle (esbuild)
-        # Consolida o TypeScript em CommonJS (.cjs) para compatibilidade com pkg
-        run: npm run build
-
-      - name: Generate Binaries (pkg)
+      - name: Generate Binaries (Bun Compile)
         # Gera executáveis estáticos para x64 e arm64
-        run: npm run package
+        run: bun run package
 
       - name: Prepare Assets
         shell: bash

@@ -53,6 +53,48 @@ pub async fn get_adb_device_id() -> Option<String> {
     None
 }
 
+pub fn parse_wm_size_output(stdout: &str) -> Option<(u32, u32)> {
+    // Searches for "Override size:" first, then falls back to "Physical size:"
+    let mut chosen_size = None;
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("Override size:") {
+            chosen_size = trimmed.split(':').nth(1);
+            break;
+        } else if trimmed.starts_with("Physical size:") {
+            chosen_size = trimmed.split(':').nth(1);
+        }
+    }
+
+    if let Some(dims) = chosen_size {
+        let parts: Vec<&str> = dims.trim().split('x').collect();
+        if parts.len() == 2 {
+            if let (Ok(d1), Ok(d2)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                if d1 > 0 && d2 > 0 {
+                    // Return landscape orientation (width = max, height = min)
+                    return Some((d1.max(d2), d1.min(d2)));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+pub async fn get_device_screen_size(device_id: Option<&str>) -> Option<(u32, u32)> {
+    let mut cmd = Command::new("adb");
+    if let Some(id) = device_id {
+        cmd.args(&["-s", id]);
+    }
+    cmd.args(&["shell", "wm", "size"]);
+    let output = cmd.output().await.ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    parse_wm_size_output(&stdout)
+}
+
 pub async fn has_gnirehtet() -> bool {
     which::which("gnirehtet").is_ok()
 }
@@ -136,5 +178,28 @@ pub async fn cleanup_stale_gnirehtet(device_id: Option<&str>) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_wm_size_physical() {
+        let stdout = "Physical size: 1800x2880\n";
+        assert_eq!(parse_wm_size_output(stdout), Some((2880, 1800)));
+    }
+
+    #[test]
+    fn test_parse_wm_size_override() {
+        let stdout = "Physical size: 1800x2880\nOverride size: 1200x1920\n";
+        assert_eq!(parse_wm_size_output(stdout), Some((1920, 1200)));
+    }
+
+    #[test]
+    fn test_parse_wm_size_invalid() {
+        assert_eq!(parse_wm_size_output(""), None);
+        assert_eq!(parse_wm_size_output("Error running wm\n"), None);
     }
 }

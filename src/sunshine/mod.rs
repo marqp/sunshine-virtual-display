@@ -18,8 +18,11 @@ pub fn generate_sunshine_config(
     let mut lines = vec![
         format!("output_name = {}", display_id),
         format!("max_bitrate = {}", max_bitrate),
-        "sw_preset = fast".to_string(),
-        "sw_tune = zerolatency".to_string(),
+        "encoder = videotoolbox".to_string(),
+        "vt_software = disabled".to_string(),
+        "vt_coder = cabac".to_string(),
+        "hevc_mode = 2".to_string(),
+        "fps = [60]".to_string(),
         "min_log_level = info".to_string(),
     ];
 
@@ -73,8 +76,15 @@ mod tests {
         let conf = generate_sunshine_config(12, 60000, true, true);
         assert!(conf.contains("output_name = 12"));
         assert!(conf.contains("max_bitrate = 60000"));
+        assert!(conf.contains("encoder = videotoolbox"));
+        assert!(conf.contains("vt_software = disabled"));
+        assert!(conf.contains("vt_coder = cabac"));
+        assert!(conf.contains("hevc_mode = 2"));
+        assert!(conf.contains("fps = [60]"));
         assert!(conf.contains("fec_percentage = 0"));
         assert!(!conf.contains("audio_sink = disabled"));
+        assert!(!conf.contains("sw_preset"));
+        assert!(!conf.contains("sw_tune"));
 
         let conf_no_usb = generate_sunshine_config(5, 30000, false, false);
         assert!(conf_no_usb.contains("output_name = 5"));

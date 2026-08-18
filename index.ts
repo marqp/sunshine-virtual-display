@@ -9,6 +9,11 @@ import { generateSunshineConfig } from './src/sunshine.js';
 import { writeSunshineConfigAtomic } from './src/io.js';
 import { ProcessManager } from './src/process-manager.js';
 import { runDaemon } from './src/daemon.js';
+import {
+  startGnirehtetTunnel,
+  whitelistGnirehtetBattery,
+  cleanupStaleGnirehtet
+} from './src/gnirehtet.js';
 
 /**
  * Compatibility for hybrid environments (Node.js/Bun) and ES modules (ESM).
@@ -175,32 +180,31 @@ async function main() {
   pm.registerSunshine(sunshineProcess);
 
   if (useUsbTethering) {
+    if (connectedDeviceId) {
+      await whitelistGnirehtetBattery(connectedDeviceId);
+    }
+    await cleanupStaleGnirehtet(connectedDeviceId);
+
     console.log(cyan('🔌 Starting USB tunnel (Gnirehtet)...'));
     const startGnirehtet = (isRestart = false) => {
       if (isRestart) {
         console.log(yellow('🔄 Restarting USB tunnel (Gnirehtet)...'));
       }
 
-      const gnirehtetProcess = spawn('gnirehtet', ['run'], {
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
-      pm.registerGnirehtet(gnirehtetProcess);
-
-      if (gnirehtetProcess.stderr) {
-        gnirehtetProcess.stderr.on('data', (data) => {
-          const msg = data.toString();
-          if (msg.includes('Exception') || msg.includes('Error') || msg.includes('fail')) {
-            console.error(red(`[Gnirehtet] ${msg.trim()}`));
+      const gnirehtetProcess = startGnirehtetTunnel({
+        deviceId: connectedDeviceId,
+        routes: '10.0.2.2/32',
+        onExit: (code) => {
+          if (!pm.isShuttingDown) {
+            console.log(
+              yellow(`\n⚠️  USB tunnel closed unexpectedly (code ${code}). Restarting in 2s...`)
+            );
+            setTimeout(() => startGnirehtet(true), 2000);
           }
-        });
-      }
-
-      gnirehtetProcess.on('exit', (code) => {
-        if (!pm.isShuttingDown) {
-          console.log(yellow(`\n⚠️  USB tunnel closed unexpectedly (code ${code}). Restarting in 2s...`));
-          setTimeout(() => startGnirehtet(true), 2000);
         }
       });
+
+      pm.registerGnirehtet(gnirehtetProcess, connectedDeviceId);
     };
 
     startGnirehtet();

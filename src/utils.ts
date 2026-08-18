@@ -15,7 +15,9 @@ export async function findSunshineBin(): Promise<string> {
       await access(process.env.SUNSHINE_BIN_PATH);
       return process.env.SUNSHINE_BIN_PATH;
     } catch {
-      throw new Error(`SUNSHINE_BIN_PATH is set to "${process.env.SUNSHINE_BIN_PATH}" but the file does not exist or is not accessible.`);
+      throw new Error(
+        `SUNSHINE_BIN_PATH is set to "${process.env.SUNSHINE_BIN_PATH}" but the file does not exist or is not accessible.`
+      );
     }
   }
 
@@ -82,7 +84,15 @@ export async function hasGnirehtet(): Promise<boolean> {
  */
 export async function isMoonlightInstalled(deviceId: string): Promise<boolean> {
   try {
-    const { stdout } = await execFilePromise('adb', ['-s', deviceId, 'shell', 'pm', 'list', 'packages', 'com.limelight']);
+    const { stdout } = await execFilePromise('adb', [
+      '-s',
+      deviceId,
+      'shell',
+      'pm',
+      'list',
+      'packages',
+      'com.limelight'
+    ]);
     return stdout.includes('package:com.limelight');
   } catch {
     return false;
@@ -95,9 +105,14 @@ export async function isMoonlightInstalled(deviceId: string): Promise<boolean> {
 export async function launchMoonlight(deviceId: string): Promise<void> {
   try {
     await execFilePromise('adb', [
-      '-s', deviceId, 'shell', 'monkey',
-      '-p', 'com.limelight',
-      '-c', 'android.intent.category.LAUNCHER',
+      '-s',
+      deviceId,
+      'shell',
+      'monkey',
+      '-p',
+      'com.limelight',
+      '-c',
+      'android.intent.category.LAUNCHER',
       '1'
     ]);
   } catch {

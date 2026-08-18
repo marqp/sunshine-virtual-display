@@ -1,5 +1,6 @@
 import { ChildProcess } from 'child_process';
 import { green, red, yellow } from 'kleur/colors';
+import { stopGnirehtetTunnel } from './gnirehtet.js';
 
 /**
  * ProcessManager encapsulates the lifecycle and cleanup of child processes
@@ -10,6 +11,7 @@ export class ProcessManager {
   private displayDaemon: ChildProcess | null = null;
   private sunshineProcess: ChildProcess | null = null;
   private gnirehtetProcess: ChildProcess | null = null;
+  private gnirehtetDeviceId: string | null = null;
   private usbMonitorInterval: NodeJS.Timeout | null = null;
   public isShuttingDown = false;
 
@@ -42,10 +44,13 @@ export class ProcessManager {
   }
 
   /**
-   * Registers the USB tunnel (Gnirehtet) process.
+   * Registers the USB tunnel (Gnirehtet) process and optional deviceId.
    */
-  public registerGnirehtet(child: ChildProcess): void {
+  public registerGnirehtet(child: ChildProcess, deviceId?: string | null): void {
     this.gnirehtetProcess = child;
+    if (deviceId) {
+      this.gnirehtetDeviceId = deviceId;
+    }
   }
 
   /**
@@ -70,10 +75,10 @@ export class ProcessManager {
     console.log(red(' 🧹 Closing processes and cleaning up... '));
     console.log(red('========================================='));
 
-    // 1. Close USB Tunnel
+    // 1. Close USB Tunnel & Cleanup Android VPN Client
     if (this.gnirehtetProcess && !this.gnirehtetProcess.killed) {
       console.log(yellow('-> Closing USB tunnel (Gnirehtet)...'));
-      this.gnirehtetProcess.kill('SIGINT');
+      stopGnirehtetTunnel(this.gnirehtetProcess, this.gnirehtetDeviceId).catch(() => {});
     }
 
     // 2. Close Sunshine Server

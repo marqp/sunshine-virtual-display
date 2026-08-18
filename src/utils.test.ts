@@ -153,7 +153,17 @@ describe('System Utilities (src/utils.ts)', () => {
       await launchMoonlight('SERIAL123');
       expect(execFile).toHaveBeenCalledWith(
         'adb',
-        ['-s', 'SERIAL123', 'shell', 'monkey', '-p', 'com.limelight', '-c', 'android.intent.category.LAUNCHER', '1'],
+        [
+          '-s',
+          'SERIAL123',
+          'shell',
+          'monkey',
+          '-p',
+          'com.limelight',
+          '-c',
+          'android.intent.category.LAUNCHER',
+          '1'
+        ],
         expect.any(Function)
       );
     });
